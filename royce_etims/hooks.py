@@ -8,18 +8,22 @@ app_license = "mit"
 # Apps
 # ------------------
 
-# required_apps = []
+# Doctypes here Link to Company/Branch, which belong to erpnext, not core frappe -
+# without this, installing on a site without erpnext installed first fails at
+# doctype sync ("options is not a valid doctype"). Found by comparing against
+# csf_ke, which declares the same for its own erpnext/hrms dependency.
+required_apps = ["erpnext"]
 
 # Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "royce_etims",
-# 		"logo": "/assets/royce_etims/logo.png",
-# 		"title": "Royce Etims",
-# 		"route": "/royce_etims",
-# 		"has_permission": "royce_etims.api.permission.has_app_permission"
-# 	}
-# ]
+add_to_apps_screen = [
+	{
+		"name": "royce_etims",
+		"logo": "/assets/royce_etims/logo.png",
+		"title": "Royce Etims",
+		"route": "/app/etims-settings",
+		"has_permission": "royce_etims.check_app_permission",
+	}
+]
 
 # Includes in <head>
 # ------------------
@@ -43,7 +47,7 @@ app_license = "mit"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {"Item": "public/js/item.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -86,7 +90,7 @@ app_license = "mit"
 # ------------
 
 # before_install = "royce_etims.install.before_install"
-# after_install = "royce_etims.install.after_install"
+after_install = "royce_etims.setup.after_install"
 
 # Uninstallation
 # ------------
@@ -138,39 +142,31 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+# Which doctypes can trigger an eTIMS sign call is gated per-company by
+# eTIMS Settings.sign_pos_invoices / sign_sales_invoices - see
+# royce_etims.etims_sync.receipt for why both point at the same handler.
+doc_events = {
+	"POS Invoice": {
+		"on_submit": "royce_etims.etims_sync.receipt.on_submit",
+	},
+	"Sales Invoice": {
+		"on_submit": "royce_etims.etims_sync.receipt.on_submit",
+	},
+}
 
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"royce_etims.tasks.all"
-# 	],
-# 	"daily": [
-# 		"royce_etims.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"royce_etims.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"royce_etims.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"royce_etims.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"cron": {
+		"*/15 * * * *": ["royce_etims.etims_sync.receipt.retry_failed_receipts"],
+	},
+}
 
 # Testing
 # -------
 
-# before_tests = "royce_etims.install.before_tests"
+before_tests = "royce_etims.setup.utils.before_tests"
 
 # Extend DocType Class
 # ------------------------------

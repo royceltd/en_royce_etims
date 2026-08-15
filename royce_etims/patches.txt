@@ -4,3 +4,7 @@
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
+royce_etims.patches.v0_0.add_etims_custom_fields
+royce_etims.patches.v0_0.add_pos_invoice_etims_fields
+royce_etims.patches.v0_0.seed_etims_reference_data
+royce_etims.patches.v0_0.add_etims_reference_fields_to_item
