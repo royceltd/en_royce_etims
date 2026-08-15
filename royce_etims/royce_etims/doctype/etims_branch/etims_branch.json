@@ -1,0 +1,124 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:{company}-{bhf_id}",
+ "creation": "2026-08-15 20:27:58.364192",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "branch",
+  "column_break_branch",
+  "bhf_id",
+  "device_status",
+  "device_section",
+  "dvc_srl_no",
+  "column_break_device",
+  "cmc_key",
+  "registered_on",
+  "last_invoice_no"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_branch",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bhf_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Branch ID (bhfId)",
+   "reqd": 1
+  },
+  {
+   "default": "Not Registered",
+   "fieldname": "device_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Device Status",
+   "options": "Not Registered\nRegistered\nActive",
+   "read_only": 1
+  },
+  {
+   "fieldname": "device_section",
+   "fieldtype": "Section Break",
+   "label": "Device"
+  },
+  {
+   "fieldname": "dvc_srl_no",
+   "fieldtype": "Data",
+   "label": "Device Serial No (dvcSrlNo)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_device",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cmc_key",
+   "fieldtype": "Password",
+   "label": "CMC Key",
+   "read_only": 1
+  },
+  {
+   "fieldname": "registered_on",
+   "fieldtype": "Datetime",
+   "label": "Registered On",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "KRA requires a strictly sequential invcNo per device. Incremented atomically on each Sales Invoice sync through this branch.",
+   "fieldname": "last_invoice_no",
+   "fieldtype": "Int",
+   "label": "Last Invoice No Sent",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-15 21:23:22.051130",
+ "modified_by": "Administrator",
+ "module": "Royce Etims",
+ "name": "eTIMS Branch",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

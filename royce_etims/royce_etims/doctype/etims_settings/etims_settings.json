@@ -1,0 +1,163 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:company",
+ "creation": "2026-08-15 20:27:57.645716",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "tin",
+  "environment",
+  "status",
+  "apigee_section",
+  "apigee_app_id",
+  "apigee_client_id",
+  "apigee_column_break",
+  "apigee_client_secret",
+  "token_section",
+  "access_token",
+  "token_expiry",
+  "default_branch",
+  "sign_section",
+  "sign_pos_invoices",
+  "sign_sales_invoices"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "tin",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "TIN (KRA PIN)",
+   "reqd": 1
+  },
+  {
+   "default": "Sandbox",
+   "fieldname": "environment",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Environment",
+   "options": "Sandbox\nProduction",
+   "reqd": 1
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Draft\nActive\nDisabled",
+   "read_only": 1
+  },
+  {
+   "fieldname": "apigee_section",
+   "fieldtype": "Section Break",
+   "label": "Apigee Credentials"
+  },
+  {
+   "fieldname": "apigee_app_id",
+   "fieldtype": "Data",
+   "label": "Apigee App ID"
+  },
+  {
+   "fieldname": "apigee_client_id",
+   "fieldtype": "Data",
+   "label": "Apigee Client ID",
+   "reqd": 1
+  },
+  {
+   "fieldname": "apigee_column_break",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "apigee_client_secret",
+   "fieldtype": "Password",
+   "label": "Apigee Client Secret",
+   "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "token_section",
+   "fieldtype": "Section Break",
+   "label": "Cached Token"
+  },
+  {
+   "fieldname": "access_token",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "Access Token",
+   "read_only": 1
+  },
+  {
+   "fieldname": "token_expiry",
+   "fieldtype": "Datetime",
+   "label": "Token Expiry",
+   "read_only": 1
+  },
+  {
+   "description": "Used as the submitting device for calls that aren't tied to one branch, e.g. item sync. Must be an Active branch under this company.",
+   "fieldname": "default_branch",
+   "fieldtype": "Link",
+   "label": "Default Branch (for company-wide submissions)",
+   "options": "eTIMS Branch"
+  },
+  {
+   "fieldname": "sign_section",
+   "fieldtype": "Section Break",
+   "label": "What to Sign"
+  },
+  {
+   "default": "1",
+   "description": "Point-of-sale, payment collected immediately - the direct match to a KRA fiscal receipt.",
+   "fieldname": "sign_pos_invoices",
+   "fieldtype": "Check",
+   "label": "Sign POS Invoices (receipts)"
+  },
+  {
+   "default": "0",
+   "description": "Off by default - credit invoices raise separate compliance questions (timing, amendments) not yet resolved. Turn on deliberately.",
+   "fieldname": "sign_sales_invoices",
+   "fieldtype": "Check",
+   "label": "Sign Sales Invoices (credit/general)"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-16 01:36:51.429130",
+ "modified_by": "Administrator",
+ "module": "Royce Etims",
+ "name": "eTIMS Settings",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
