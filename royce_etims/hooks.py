@@ -18,7 +18,7 @@ required_apps = ["erpnext"]
 add_to_apps_screen = [
 	{
 		"name": "royce_etims",
-		"logo": "/assets/royce_etims/logo.png",
+		"logo": "/assets/royce_etims/logo.svg",
 		"title": "Royce Etims",
 		"route": "/app/etims-settings",
 		"has_permission": "royce_etims.check_app_permission",
