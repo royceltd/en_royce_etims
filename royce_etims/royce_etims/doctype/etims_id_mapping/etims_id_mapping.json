@@ -1,0 +1,61 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-08-16 02:11:19.677418",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "setup_doctype",
+  "setup_docname",
+  "etims_id",
+  "disabled"
+ ],
+ "fields": [
+  {
+   "default": "eTIMS Settings",
+   "fieldname": "setup_doctype",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Setup DocType",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "setup_docname",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "label": "Setup Docname (Company)",
+   "options": "setup_doctype",
+   "reqd": 1
+  },
+  {
+   "fieldname": "etims_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "eTIMS ID",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-16 02:11:19.677418",
+ "modified_by": "Administrator",
+ "module": "Royce Etims",
+ "name": "eTIMS ID Mapping",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
