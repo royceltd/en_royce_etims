@@ -1,23 +1,12 @@
 // Copyright (c) 2026, Royce Technologies LTD and contributors
 // For license information, please see license.txt
 
-frappe.ui.form.on("eTIMS Settings", {
-	refresh(frm) {
-		if (frm.is_new()) return;
+// No standalone "Test Connection" here - the real OSCU API has no separate
+// credentials step (no OAuth layer, confirmed - see docs/architecture.md).
+// The first genuine connectivity check happens at device registration, on
+// the eTIMS Branch form.
 
-		frm.add_custom_button(__("Test Connection"), () => {
-			frappe.call({
-				doc: frm.doc,
-				method: "test_connection",
-				freeze: true,
-				freeze_message: __("Contacting eTIMS..."),
-				callback: (r) => {
-					if (r.message?.success) {
-						frappe.show_alert({ message: r.message.message, indicator: "green" });
-						frm.reload_doc();
-					}
-				},
-			});
-		});
-	},
-});
+// frappe.ui.form.on("eTIMS Settings", {
+// 	refresh(frm) {
+// 	},
+// });

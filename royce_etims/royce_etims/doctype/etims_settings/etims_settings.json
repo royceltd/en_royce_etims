@@ -11,14 +11,6 @@
   "tin",
   "environment",
   "status",
-  "apigee_section",
-  "apigee_app_id",
-  "apigee_client_id",
-  "apigee_column_break",
-  "apigee_client_secret",
-  "token_section",
-  "access_token",
-  "token_expiry",
   "default_branch",
   "sign_section",
   "sign_pos_invoices",
@@ -60,51 +52,6 @@
    "read_only": 1
   },
   {
-   "fieldname": "apigee_section",
-   "fieldtype": "Section Break",
-   "label": "Apigee Credentials"
-  },
-  {
-   "fieldname": "apigee_app_id",
-   "fieldtype": "Data",
-   "label": "Apigee App ID"
-  },
-  {
-   "fieldname": "apigee_client_id",
-   "fieldtype": "Data",
-   "label": "Apigee Client ID",
-   "reqd": 1
-  },
-  {
-   "fieldname": "apigee_column_break",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "apigee_client_secret",
-   "fieldtype": "Password",
-   "label": "Apigee Client Secret",
-   "reqd": 1
-  },
-  {
-   "collapsible": 1,
-   "fieldname": "token_section",
-   "fieldtype": "Section Break",
-   "label": "Cached Token"
-  },
-  {
-   "fieldname": "access_token",
-   "fieldtype": "Password",
-   "hidden": 1,
-   "label": "Access Token",
-   "read_only": 1
-  },
-  {
-   "fieldname": "token_expiry",
-   "fieldtype": "Datetime",
-   "label": "Token Expiry",
-   "read_only": 1
-  },
-  {
    "description": "Used as the submitting device for calls that aren't tied to one branch, e.g. item sync. Must be an Active branch under this company.",
    "fieldname": "default_branch",
    "fieldtype": "Link",
@@ -134,7 +81,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-16 01:36:51.429130",
+ "modified": "2026-08-16 15:22:26.422447",
  "modified_by": "Administrator",
  "module": "Royce Etims",
  "name": "eTIMS Settings",

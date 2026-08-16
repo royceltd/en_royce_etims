@@ -17,7 +17,8 @@
   "column_break_device",
   "cmc_key",
   "registered_on",
-  "last_invoice_no"
+  "last_invoice_no",
+  "sdc_id"
  ],
  "fields": [
   {
@@ -90,12 +91,19 @@
    "fieldtype": "Int",
    "label": "Last Invoice No Sent",
    "read_only": 1
+  },
+  {
+   "description": "Sales/Control Device ID returned alongside cmcKey at registration.",
+   "fieldname": "sdc_id",
+   "fieldtype": "Data",
+   "label": "SDC ID",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-15 21:23:22.051130",
+ "modified": "2026-08-16 15:22:27.027947",
  "modified_by": "Administrator",
  "module": "Royce Etims",
  "name": "eTIMS Branch",

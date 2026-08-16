@@ -3,9 +3,16 @@
 
 """Generic authenticated client for the KRA eTIMS OSCU API.
 
-Every business endpoint (saveItem, sendSalesTransaction, initialize, ...) should go
-through `request()` here rather than calling `requests` directly, so that token
-caching/refresh, the standard headers, and eTIMS Log entries stay in one place.
+Every business endpoint (saveItem, saveTrnsSalesOsdc, selectInitOsdcInfo, ...)
+should go through `request()` here rather than calling `requests` directly, so
+that the standard headers and eTIMS Log entries stay in one place.
+
+No OAuth/bearer-token layer: confirmed against two independent sources (KRA's
+own OSCU Specification Document v2.0, and navariltd/kenya-compliance - tested
+against the real KRA sandbox in 2024) that the actual API authenticates with
+tin/bhfId/cmcKey headers only. See docs/architecture.md for the full
+correction history - this replaced an earlier Apigee-OAuth design modeled on
+a Postman collection that turned out to target a different host entirely.
 """
 
 import json
@@ -14,18 +21,8 @@ import frappe
 import requests
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import add_to_date, get_datetime, now_datetime
 
-from royce_etims.utils.config import (
-	PRODUCTION_BASE_URL,
-	PRODUCTION_TOKEN_URL,
-	SANDBOX_BASE_URL,
-	SANDBOX_TOKEN_URL,
-)
-
-# Safety margin before a cached token's real expiry at which we treat it as stale
-# and refresh anyway, so we don't hand out a token that expires mid-request.
-TOKEN_REFRESH_MARGIN_SECONDS = 30
+from royce_etims.utils.config import PRODUCTION_BASE_URL, SANDBOX_BASE_URL
 
 REQUEST_TIMEOUT_SECONDS = 60
 
@@ -41,19 +38,18 @@ def get_branch(branch):
 	return frappe.get_doc("eTIMS Branch", branch)
 
 
-def get_urls(settings):
+def get_base_url(settings):
 	if settings.environment == "Sandbox":
-		return SANDBOX_TOKEN_URL, SANDBOX_BASE_URL
+		return SANDBOX_BASE_URL
 
 	if settings.environment == "Production":
-		if not (PRODUCTION_TOKEN_URL and PRODUCTION_BASE_URL):
+		if not PRODUCTION_BASE_URL:
 			frappe.throw(
-				_(
-					"Production eTIMS endpoints are not configured yet. Confirm the live "
-					"URLs with KRA before switching {0} to Production."
-				).format(settings.company)
+				_("Production eTIMS endpoint is not configured yet. Confirm the live URL with KRA before switching {0} to Production.").format(
+					settings.company
+				)
 			)
-		return PRODUCTION_TOKEN_URL, PRODUCTION_BASE_URL
+		return PRODUCTION_BASE_URL
 
 	frappe.throw(_("Unknown eTIMS environment: {0}").format(settings.environment))
 
@@ -69,58 +65,6 @@ def _do_request(method, url, **kwargs):
 		frappe.throw(_("Could not reach eTIMS at {0}: {1}").format(url, str(e)))
 
 
-def generate_token(settings):
-	"""Fetch a fresh access token from Apigee and cache it on the settings doc."""
-	token_url, _base_url = get_urls(settings)
-	client_id = settings.apigee_client_id
-	client_secret = settings.get_password("apigee_client_secret")
-
-	if not (client_id and client_secret):
-		frappe.throw(_("Apigee Client ID/Secret are not set on eTIMS Settings for {0}").format(settings.company))
-
-	response = _do_request(
-		"GET",
-		token_url,
-		params={"grant_type": "client_credentials"},
-		auth=(client_id, client_secret),
-	)
-
-	_log_call(
-		settings,
-		endpoint=token_url,
-		request_body={"grant_type": "client_credentials"},
-		response=response,
-	)
-
-	if not response.ok:
-		frappe.throw(
-			_("Failed to generate eTIMS access token for {0}: {1}").format(settings.company, response.text)
-		)
-
-	data = response.json()
-	token = data.get("access_token")
-	if not token:
-		frappe.throw(_("eTIMS token endpoint did not return an access_token: {0}").format(data))
-
-	settings.db_set("access_token", token, notify=False)
-	expires_in = data.get("expires_in")
-	if expires_in:
-		settings.db_set(
-			"token_expiry", add_to_date(now_datetime(), seconds=int(expires_in)), notify=False
-		)
-
-	return token
-
-
-def get_valid_token(settings, force_refresh=False):
-	if not force_refresh and settings.access_token and settings.token_expiry:
-		safe_until = add_to_date(now_datetime(), seconds=TOKEN_REFRESH_MARGIN_SECONDS)
-		if get_datetime(settings.token_expiry) > safe_until:
-			return settings.get_password("access_token")
-
-	return generate_token(settings)
-
-
 def request(
 	company,
 	endpoint,
@@ -130,20 +74,17 @@ def request(
 	reference_doctype=None,
 	reference_name=None,
 ):
-	"""Call an eTIMS business endpoint with standard auth/headers, and log it.
+	"""Call an eTIMS business endpoint with standard headers, and log it.
 
-	`branch` should be passed (an eTIMS Branch doc or name) for every endpoint that
-	needs the tin/bhfId/cmcKey headers - i.e. everything except `initialize` itself,
-	where the device isn't registered yet and those values are the request body.
+	`branch` should be passed (an eTIMS Branch doc or name) for every endpoint
+	that needs the tin/bhfId/cmcKey headers - i.e. everything except
+	`selectInitOsdcInfo` itself, where the device isn't registered yet and
+	tin/bhfId travel in the body instead, with no cmcKey to send.
 	"""
 	settings = get_settings(company)
-	_token_url, base_url = get_urls(settings)
+	base_url = get_base_url(settings)
 
-	headers = {
-		"Content-Type": "application/json",
-		"apigee_app_id": settings.apigee_app_id or "",
-		"Authorization": f"Bearer {get_valid_token(settings)}",
-	}
+	headers = {"Content-Type": "application/json"}
 
 	branch_doc = None
 	if branch:
@@ -152,7 +93,11 @@ def request(
 			{
 				"tin": settings.tin,
 				"bhfId": branch_doc.bhf_id,
-				"cmcKey": branch_doc.get_password("cmc_key") or "",
+				# raise_exception=False: a branch with no cmcKey yet (never
+				# registered) has nothing in the password vault at all, and
+				# get_password() raises by default in that case rather than
+				# just returning empty - found via testing, not assumed.
+				"cmcKey": branch_doc.get_password("cmc_key", raise_exception=False) or "",
 			}
 		)
 
@@ -177,10 +122,8 @@ def request(
 	if not response.ok:
 		frappe.throw(_("eTIMS call to {0} failed ({1}): {2}").format(endpoint, response.status_code, data or response.text))
 
-	# KRA's eTIMS responses wrap the payload with a resultCd/resultMsg envelope where
-	# "000" means success - this is the documented convention for the OSCU spec, but
-	# there are no sample responses in the sandbox collection to verify field-for-field
-	# against, so treat this check as best-effort until confirmed live.
+	# resultCd "000" = success - confirmed against kenya-compliance's actual
+	# response handling (not a guess, unlike the earlier version of this check).
 	result_cd = data.get("resultCd") if isinstance(data, dict) else None
 	if result_cd is not None and result_cd != "000":
 		frappe.throw(

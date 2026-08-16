@@ -1,16 +1,18 @@
 # Copyright (c) 2026, Royce Technologies LTD and contributors
 # For license information, please see license.txt
 
-"""Async Sales Invoice / POS Invoice -> KRA sendSalesTransaction ("issue a
+"""Async Sales Invoice / POS Invoice -> KRA saveTrnsSalesOsdc ("issue a
 receipt"), per docs/architecture.md section 4: submission in ERPNext never
 blocks on KRA; sync happens as a background job with a visible status and a
 scheduled retry sweep for failures.
 
-KRA's OSCU API has one call for this - sendSalesTransaction - there's no
-separate "sign invoice" vs "sign receipt" endpoint; the payload itself carries
-a nested `receipt` sub-object. What we actually control is which ERPNext event
-triggers that one call. Two doctypes can trigger it, gated independently on
-eTIMS Settings:
+KRA's OSCU API has one call for this - saveTrnsSalesOsdc (confirmed name;
+the original Postman collection called it sendSalesTransaction, which turned
+out to be wrong - see docs/architecture.md's correction history) - there's
+no separate "sign invoice" vs "sign receipt" endpoint; the payload itself
+carries a nested `receipt` sub-object. What we actually control is which
+ERPNext event triggers that one call. Two doctypes can trigger it, gated
+independently on eTIMS Settings:
 
   - POS Invoice: point-of-sale, payment collected immediately - the direct
     match to a fiscal receipt. Signed by default (sign_pos_invoices).
@@ -39,7 +41,9 @@ from frappe import _
 from frappe.utils import flt, getdate, now_datetime
 
 from royce_etims.utils.api_client import request as etims_request
+from royce_etims.utils.config import PRODUCTION_QR_VERIFY_BASE_URL, SANDBOX_QR_VERIFY_BASE_URL
 from royce_etims.utils.id_mapping import get_etims_id
+from royce_etims.utils.qr_code import build_verification_url, generate_qr_data_uri
 from royce_etims.utils.validation import validate_kra_pin
 
 MAX_RETRY_COUNT = 5
@@ -116,7 +120,7 @@ def sync_receipt(doctype, name):
 		payload = build_receipt_payload(doc, invc_no)
 		data = etims_request(
 			doc.company,
-			"sendSalesTransaction",
+			"saveTrnsSalesOsdc",
 			payload=payload,
 			method="POST",
 			branch=branch,
@@ -131,10 +135,40 @@ def sync_receipt(doctype, name):
 		frappe.db.commit()
 		return
 
+	settings = frappe.get_cached_doc("eTIMS Settings", doc.company)
+	_apply_success(doc, invc_no, data, settings, branch)
+
+
+def _apply_success(doc, invc_no, data, settings, branch):
+	"""Store KRA's confirmed saveTrnsSalesOsdc response shape and generate
+	the receipt QR code. Field names and the verification-URL formula are
+	from navariltd/kenya-compliance's actual (sandbox-tested) implementation,
+	not guessed - replaces what used to be a raw-JSON dump with no QR code."""
+	info = data.get("data") or {}
+	receipt_signature = info.get("rcptSign")
+
 	doc.db_set("etims_status", "Sent", notify=False)
 	doc.db_set("etims_invoice_number", invc_no, notify=False)
-	doc.db_set("etims_raw_response", frappe.as_json(data), notify=False)
 	doc.db_set("etims_error", "", notify=False)
+	doc.db_set("etims_receipt_signature", receipt_signature, notify=False)
+	doc.db_set("etims_current_receipt_number", info.get("curRcptNo"), notify=False)
+	doc.db_set("etims_total_receipt_number", info.get("totRcptNo"), notify=False)
+	doc.db_set("etims_internal_data", info.get("intrlData"), notify=False)
+	doc.db_set("etims_control_unit_datetime", info.get("sdcDateTime"), notify=False)
+
+	if not receipt_signature:
+		# Success per resultCd, but no signature to build a QR from - log and
+		# move on rather than block the whole sync on a QR code specifically.
+		frappe.log_error(title=f"eTIMS: no rcptSign in successful response for {doc.name}")
+		return
+
+	qr_verify_base_url = SANDBOX_QR_VERIFY_BASE_URL if settings.environment == "Sandbox" else PRODUCTION_QR_VERIFY_BASE_URL
+	if not qr_verify_base_url:
+		return
+
+	verification_url = build_verification_url(qr_verify_base_url, settings.tin, branch.bhf_id, receipt_signature)
+	doc.db_set("etims_qr_verification_url", verification_url, notify=False)
+	doc.db_set("etims_qr_code", generate_qr_data_uri(verification_url), notify=False)
 
 
 def retry_failed_receipts():
@@ -237,6 +271,7 @@ def build_receipt_payload(doc, invc_no):
 	payload = {
 		"invcNo": invc_no,
 		"orgInvcNo": 0,  # credit-note/orig-invoice linkage not handled yet - see docs/architecture.md open items
+		"trdInvcNo": doc.name,
 		"custTin": doc.tax_id or None,
 		"custNm": doc.customer_name,
 		"salesTyCd": "N",

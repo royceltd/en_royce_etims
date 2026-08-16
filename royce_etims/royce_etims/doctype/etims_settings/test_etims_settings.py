@@ -21,8 +21,6 @@ class IntegrationTesteTIMSSettings(IntegrationTestCase):
 				"company": TEST_COMPANY,
 				"tin": "P123456789H",
 				"environment": "Sandbox",
-				"apigee_client_id": "test-id",
-				"apigee_client_secret": "test-secret",
 			}
 		).insert()
 		self.assertEqual(doc.name, TEST_COMPANY)
@@ -35,8 +33,6 @@ class IntegrationTesteTIMSSettings(IntegrationTestCase):
 				"company": TEST_COMPANY,
 				"tin": "not-a-real-tin",
 				"environment": "Sandbox",
-				"apigee_client_id": "test-id",
-				"apigee_client_secret": "test-secret",
 			}
 		)
 		self.assertRaises(frappe.ValidationError, doc.insert)
