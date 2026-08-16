@@ -17,9 +17,13 @@ Specification Document v2.0**, and **navariltd/kenya-compliance** (an ERPNext OS
 actually tested against the KRA sandbox in 2024, cloned locally for study) - both agree on a
 different picture:
 
-- **Correct base URL:** `https://etims-api-sbx.kra.go.ke/etims-api` (sandbox),
-  `https://etims-api.kra.go.ke/etims-api` (production) - a different host entirely, not a typo of
-  the original.
+- **Correct base URL:** `https://etims-api-sbx.kra.go.ke` (sandbox), `https://etims-api.kra.go.ke`
+  (production) - a different host entirely, not a typo of the original. **Corrected a second time**
+  after directly reading KRA's own official "eTIMS OSCU AND VSCU Step-by-Step Guide" (v1.1): its
+  page 8 worked example gives the full URL as `https://etims-api-sbx.kra.go.ke/selectInitOsdcInfo`
+  - no `/etims-api` path segment, which the first correction (based on kenya-compliance's
+  `SANDBOX_SERVER_URL` constant) had included. The primary source wins; the constant was likely a
+  stale default real deployments overrode via their own editable `server_url` setting.
 - **No OAuth layer at all.** kenya-compliance's Settings doctype has no client_id/secret/token
   field, and its whole codebase has zero bearer-token code. Every call authenticates with
   `tin`/`bhfId`/`cmcKey` headers only - the device credential *is* the auth, no separate token
@@ -54,11 +58,32 @@ Verified instead by mocking the network boundary and exercising the real code pa
 confirmed response shapes. Real sandbox credentials would be the next level of confidence beyond
 this.
 
+## Getting real sandbox credentials — next step
+
+Per KRA's official "eTIMS OSCU AND VSCU Step-by-Step Guide" (v1.1):
+
+1. Sign up at the **eTIMS taxpayer sandbox portal** — `https://etims-sbx.kra.go.ke`. Sign-up needs
+   the company's KRA PIN, phone OTP verification, and a chosen password.
+2. Log in → **Service Request** button → **eTIMS** → fill the Service Request form (taxpayer info
+   auto-populates from the PIN) → select **eTims Type = OSCU**. Also upload a **signed eTIMS
+   Commitment Form** (PDF/JPG) — a real document requirement, template linked from the guide.
+3. KRA processes the request; approval arrives as an SMS ("Service Request was approved. You can
+   now proceed with eTIMS installation"). **Not instant** - budget for a wait, duration
+   unspecified in the guide.
+4. Once approved, device registration (our `eTIMS Branch.register_device()`) becomes callable
+   against the sandbox host confirmed above.
+
+Worth noting from the same guide: **VSCU is architecturally different, not just a different URL**
+- it's a Java JAR (`etims-vscu-<version>.jar`, requires JRE/JDK 16+) deployed and run **on the
+taxpayer's own server**, which then talks to KRA - not a cloud API royce_etims would call directly
+the way OSCU is. If VSCU is ever pursued, that's a deployment-model decision, not just a config
+change.
+
 ## Decisions locked so far
 
-- **Device model:** start with **OSCU** (online, real-time signing). VSCU (offline-tolerant
-  signing) is a candidate v2 once we pull its spec and diff it against OSCU — the two are not
-  assumed to be a drop-in swap.
+- **Device model:** start with **OSCU** (online, real-time signing, hosted at KRA - we call their
+  API directly). VSCU (local JAR deployed on the client's own server, offline-tolerant signing) is
+  a candidate v2 - see the sandbox-credentials section above for why it's not a drop-in swap.
 - **Tenancy:** one Frappe **site per client**, all on the same bench. Site-level isolation gives us
   tenant data separation for free; `royce_etims` itself doesn't need to know it's multi-tenant.
 - **Registration granularity:** eTIMS credentials are **not** flat per-site. A taxpayer (Company /
