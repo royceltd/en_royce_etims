@@ -12,7 +12,11 @@ app_license = "mit"
 # without this, installing on a site without erpnext installed first fails at
 # doctype sync ("options is not a valid doctype"). Found by comparing against
 # csf_ke, which declares the same for its own erpnext/hrms dependency.
-required_apps = ["erpnext"]
+#
+# kenyan_accountant is the KE Chart of Accounts/VAT/WHT foundation layer - it must
+# be installed and its tax accounts initialized before invoices can be signed
+# with correct VAT figures.
+required_apps = ["erpnext", "kenyan_accountant"]
 
 # Each item in the list will be shown as an app in the apps page
 add_to_apps_screen = [
