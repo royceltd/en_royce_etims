@@ -63,10 +63,10 @@
    "label": "Device"
   },
   {
+   "description": "Auto-generated if left blank. This is NOT your computer's hardware serial - it's a self-chosen unique identifier (Odoo's own eTIMS integration generates its own the same way: vendor prefix + PIN + sequence). Reusing a real hardware serial risks 'Device Serial Number already used' if it collides with another applicant's.",
    "fieldname": "dvc_srl_no",
    "fieldtype": "Data",
-   "label": "Device Serial No (dvcSrlNo)",
-   "reqd": 1
+   "label": "Device Serial No (dvcSrlNo)"
   },
   {
    "fieldname": "column_break_device",

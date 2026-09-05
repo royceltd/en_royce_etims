@@ -58,26 +58,116 @@ Verified instead by mocking the network boundary and exercising the real code pa
 confirmed response shapes. Real sandbox credentials would be the next level of confidence beyond
 this.
 
+## Second critical correction, 2026-09-05: the pendulum swung back
+
+The correction above was itself wrong, at least for the route this taxpayer was actually told to
+use. What happened: Royce Technologies LTD emailed KRA's eTIMS integration support directly and
+was told to proceed via **GavaConnect** (`developer.go.ke`) - KRA's own official Enterprise API
+platform. Reading `developer.go.ke/apis/KRA-ETIMS-SBX` directly (KRA's own current documentation,
+not a third party's) confirms, verbatim:
+
+> "Sandbox environment use: **https://sbx.kra.go.ke** ... the URL path for OSCU device activation
+> is indicated as (url: /initialize); therefore, the full URL path is
+> **https://sbx.kra.go.ke/etims-oscu/api/v1/initialize** in the sandbox environment."
+
+That is the **original** Postman collection's host and path structure, word for word - the thing
+the first correction concluded was "a different real one... most likely a legacy or unrelated
+program." It wasn't. Endpoint names throughout that GavaConnect page also match the original
+collection, not kenya-compliance's:
+
+| Category | Confirmed endpoint (GavaConnect docs) | kenya-compliance's name (now believed wrong for this route) |
+|---|---|---|
+| Initialization | `/initialize` | `selectInitOsdcInfo` |
+| Sales | `/sendSalesTransaction` | `saveTrnsSalesOsdc` |
+| Branch list | `/selectBhfList` | `selectBhfList` (matched) |
+| Item save | `/saveItem` | `saveItem` (matched) |
+| Purchase get/send | `/getPurchaseTransactionInfo`, `/sendPurchaseTransactionInfo` | different names |
+| Stock | `/selectStockMoveLists`, `/insert/stockIO`, `/save/stockMaster` | different names |
+
+`utils/config.py` and every endpoint name in `etims_sync/` and `eTIMS Branch.register_device()`
+have been changed back to match GavaConnect. **What's still not established:** whether
+`etims-api-sbx.kra.go.ke` (the second correction's host, from the OSCU Spec Document v2.0 and
+kenya-compliance) is a genuinely different/older/parallel API generation that still works, is being
+deprecated in favour of GavaConnect, or was never right either - not resolved, and not this
+taxpayer's documented path regardless. Don't resurrect it without a specific reason to.
+
+**Auth layer - still open.** GavaConnect's "Common Headers" table lists only tin/bhfId/cmcKey, no
+Bearer token, for the actual business endpoints. But GavaConnect also requires a mandatory "App
+creation" step before testing - normally how Apigee-fronted APIs gate access via an OAuth
+client-credentials token, exactly like the original collection's `/v1/token/generate` flow. Whether
+that's actually required in addition to tin/bhfId/cmcKey is unconfirmed. `api_client.py`
+deliberately does NOT implement it yet - added when a live call actually demands it, not before.
+
+**The "Integration Token" turned out to be something else entirely.** The taxpayer received a
+token (`KRATK04_de39f`) via email, alongside PIN/company/system name/version/device serial. This
+was first guessed to be a GavaConnect Apigee app credential. It isn't - it's a field literally
+labelled "Integration Token" on the **eTIMS Taxpayer Sandbox Portal's Service Request form**
+(`etims-sbx.kra.go.ke`, a different portal from GavaConnect entirely), with a "Verify" button,
+gating that specific Service Request. Submitting it hit **"Device Serial Number already used."**
+
+**Device serial numbers are self-chosen, not hardware IDs - and this explains the collision.**
+Odoo's own eTIMS integration confirms the pattern directly: *"an OSCU serial number is generated
+for each company... starting with the prefix `ODOO` followed by the company's VAT number and a
+sequence of numbers."* The serial supplied (`5CD6472Z8WR`) has exactly the shape of a real
+Windows/Dell hardware serial - a reasonable first instinct, but exactly the kind of value likely to
+collide (someone else's sandbox test, a stale prior attempt, shared demo hardware). `eTIMS
+Branch.validate()` now auto-generates one (`ROYCEERP-<tin>-<sequence>`) if left blank, matching
+Odoo's scheme, rather than asking for a real machine serial.
+
+**The real onboarding process is much heavier than this doc previously assumed** - see the revised
+step list below. It's not "register device, get cmcKey, start signing" - there's automated app
+testing with uploaded artefacts, a full KYC document set, a scheduled joint verification demo with
+KRA staff, and (for third-party integrators) SLA execution, all before production keys are issued.
+
 ## Getting real sandbox credentials — next step
 
-Per KRA's official "eTIMS OSCU AND VSCU Step-by-Step Guide" (v1.1):
+Confirmed 2026-09-05 against GavaConnect's own onboarding walkthrough (`developer.go.ke/apis/
+KRA-ETIMS-SBX`) - this is the real process, considerably heavier than the earlier 4-step summary
+this doc previously had:
 
-1. Sign up at the **eTIMS taxpayer sandbox portal** — `https://etims-sbx.kra.go.ke`. Sign-up needs
-   the company's KRA PIN, phone OTP verification, and a chosen password.
-2. Log in → **Service Request** button → **eTIMS** → fill the Service Request form (taxpayer info
-   auto-populates from the PIN) → select **eTims Type = OSCU**. Also upload a **signed eTIMS
-   Commitment Form** (PDF/JPG) — a real document requirement, template linked from the guide.
-3. KRA processes the request; approval arrives as an SMS ("Service Request was approved. You can
-   now proceed with eTIMS installation"). **Not instant** - budget for a wait, duration
-   unspecified in the guide.
-4. Once approved, device registration (our `eTIMS Branch.register_device()`) becomes callable
-   against the sandbox host confirmed above.
+1. **Sign up** at the eTIMS taxpayer sandbox portal (`etims-sbx.kra.go.ke`) - PIN, OTP, password.
+2. **Service Request → eTIMS → select eTims type** (OSCU / VSCU / eTIMS Client / eTIMS Online) -
+   this form has an **"Integration Token"** field with a Verify button (see the correction above -
+   this is a KRA-support-issued token gating the request, tied to your PIN + system name + version
+   + device serial, not a GavaConnect app credential). Upload a signed eTIMS Commitment Form.
+   Approval arrives by SMS - not instant.
+3. **App creation** on GavaConnect itself - separate from step 2, this is the Apigee-style app
+   registration the API-gateway layer needs (see the open auth-layer question above).
+4. **Discovery and simulation** - use the portal's "Simulate API" tool / downloadable Postman
+   collection to explore before writing code against it.
+5. **Automated App Testing** on the Developer Platform, then **upload test artefacts** (item
+   creation screenshot, invoice generation screenshot, invoice copy, credit note copy) within one
+   hour of the test completing.
+6. **KYC documentation** - eTIMS Bio Data Form, Business Registration + CR12, Business Permit,
+   National ID, Tax Compliance Certificate, proof of 3 qualified technical staff, and - **only if
+   registering as a third-party integrator, not a self-integrator** - a notarized solvency
+   declaration and a Technology Architecture document. Self-integrators only need 4 of the 8 items.
+7. **Verification** - schedule a date, KRA reviews artefacts, then a **joint verification demo
+   meeting** with KRA staff where the system's invoice/credit-note handling is demonstrated live.
+8. **SLA execution** (third-party integrators only - conducted outside the system) or an **interim
+   approval letter** (self-integrators - no SLA needed).
+9. **Production keys** issued through the portal, then go-live.
 
-Worth noting from the same guide: **VSCU is architecturally different, not just a different URL**
-- it's a Java JAR (`etims-vscu-<version>.jar`, requires JRE/JDK 16+) deployed and run **on the
-taxpayer's own server**, which then talks to KRA - not a cloud API royce_etims would call directly
-the way OSCU is. If VSCU is ever pursued, that's a deployment-model decision, not just a config
-change.
+**The strategic fork this implies for "easier client onboarding":** this entire process runs per
+*taxpayer PIN* - registering Royce Technologies LTD's own PIN (in progress) does not automatically
+cover any future client's PIN. Two models, not yet decided between:
+
+- **Self-integrator per client** - every future client repeats steps 1-9 under their own PIN,
+  choosing RoyceERP as their system. Lighter KYC per client, but a multi-week KRA-approval
+  dependency sits in the critical path of *every single client onboarding* - directly undermines
+  the "guided, fast setup" pitch the rest of this product (see the sibling `kenyan_accountant` app)
+  is built around.
+- **Royce certified as a third-party integrator** - steps 3-8 done once, thoroughly, for RoyceERP
+  itself (heavier KYC, SLA, one real demo). Each subsequent client then only needs the lighter
+  taxpayer-side steps (1-2, their own PIN/device), not a full re-proof of the software. Better
+  match for the onboarding-ease goal, but a real compliance investment up front - track it as its
+  own workstream with an owner, not an engineering task.
+
+Worth noting from KRA's Step-by-Step Guide: **VSCU is architecturally different, not just a
+different URL** - it's a Java JAR (`etims-vscu-<version>.jar`, requires JRE/JDK 16+) deployed and
+run **on the taxpayer's own server**, which then talks to KRA - not a cloud API royce_etims would
+call directly the way OSCU is. If VSCU is ever pursued, that's a deployment-model decision, not
+just a config change.
 
 ## Decisions locked so far
 
@@ -131,6 +221,18 @@ change.
 
 ## Open / not yet decided
 
+- **Self-integrator vs certified third-party integrator** (added 2026-09-05, see the correction
+  above) - the single biggest unresolved question for the "easier client onboarding" goal. Needs a
+  business decision, not a code change; CTO recommendation is third-party integrator, for scale.
+- Whether the GavaConnect Apigee OAuth layer (a Bearer token on top of tin/bhfId/cmcKey) is
+  actually required - unconfirmed both ways. First thing to check once any live call is attempted.
+- `/initialize` and `sendSalesTransaction`'s exact response envelopes are not re-confirmed against
+  GavaConnect's own docs (their Response Body sections weren't readable in the copy fetched) -
+  still running on kenya-compliance's shape as a best guess. Verify against the first real response.
+- Production base URL for GavaConnect is not confirmed at all - `PRODUCTION_BASE_URL` is
+  deliberately left empty in `utils/config.py` rather than guessed.
+- Whether `etims-api-sbx.kra.go.ke` (the abandoned second correction's host) is a dead end, a
+  parallel API generation, or something still worth supporting later - not investigated further.
 - Whether v1 needs multi-branch support day one or can ship single-branch first (leaning toward
   building the model correctly now since retrofitting is expensive, but scope of the *UI* for it
   can be trimmed).
@@ -214,7 +316,7 @@ erDiagram
 
 `ETIMS_SETTINGS` carries what's shared across the whole taxpayer (TIN, environment). `ETIMS_BRANCH`
 carries what's specific to a physical outlet — because that's the actual grain KRA's
-`selectInitOsdcInfo` call operates at (`tin` + `bhfId` + `dvcSrlNo` → `cmcKey` + `sdcId`).
+`/initialize` call operates at (`tin` + `bhfId` + `dvcSrlNo` → `cmcKey` + `sdcId`).
 
 ## 3. Onboarding flow
 
@@ -223,7 +325,7 @@ flowchart TD
     A["Client applies for eTIMS on KRA portal\n(self, or Royce assists for a fee)"] --> B["Client receives TIN +\na device serial number (dvcSrlNo) per branch"]
     B --> C["Enter TIN + environment in eTIMS Settings (Company)"]
     C --> D["Add Branch record: bhfId + dvcSrlNo"]
-    D --> E["Register device\nPOST /selectInitOsdcInfo"]
+    D --> E["Register device\nPOST /initialize"]
     E -- fail --> D
     E -- success --> F["Store cmcKey + sdcId\nBranch device_status = Registered"]
     F --> G["Bootstrap reference data\n(code list, item classification, branch list)"]
@@ -251,8 +353,8 @@ sequenceDiagram
     U->>D: Submit
     D-->>U: Submitted (eTIMS Status = Pending)
     D->>Q: enqueue sync job (royce_etims.etims_sync.receipt)
-    Q->>API: saveTrnsSalesOsdc(payload)
-    API->>KRA: POST /saveTrnsSalesOsdc
+    Q->>API: sendSalesTransaction(payload)
+    API->>KRA: POST /sendSalesTransaction
     alt success
         KRA-->>API: 200 + rcptSign/curRcptNo/totRcptNo/intrlData/sdcDateTime
         API-->>D: eTIMS Status = Sent, QR code generated from rcptSign

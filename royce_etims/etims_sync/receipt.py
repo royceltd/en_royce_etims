@@ -1,16 +1,20 @@
 # Copyright (c) 2026, Royce Technologies LTD and contributors
 # For license information, please see license.txt
 
-"""Async Sales Invoice / POS Invoice -> KRA saveTrnsSalesOsdc ("issue a
+"""Async Sales Invoice / POS Invoice -> KRA sendSalesTransaction ("issue a
 receipt"), per docs/architecture.md section 4: submission in ERPNext never
 blocks on KRA; sync happens as a background job with a visible status and a
 scheduled retry sweep for failures.
 
-KRA's OSCU API has one call for this - saveTrnsSalesOsdc (confirmed name;
-the original Postman collection called it sendSalesTransaction, which turned
-out to be wrong - see docs/architecture.md's correction history) - there's
-no separate "sign invoice" vs "sign receipt" endpoint; the payload itself
-carries a nested `receipt` sub-object. What we actually control is which
+KRA's OSCU API has one call for this - sendSalesTransaction. This name was
+originally in this codebase (from the Postman collection royce_etims was
+first built from), then changed to saveTrnsSalesOsdc during a "correction"
+that turned out to be itself wrong - confirmed back to sendSalesTransaction
+2026-09-05 against KRA's own official GavaConnect developer portal docs
+(https://developer.go.ke/apis/KRA-ETIMS-SBX). See docs/architecture.md for
+the full, embarrassing correction history. There's no separate "sign
+invoice" vs "sign receipt" endpoint; the payload itself carries a nested
+`receipt` sub-object. What we actually control is which
 ERPNext event triggers that one call. Two doctypes can trigger it, gated
 independently on eTIMS Settings:
 
@@ -120,7 +124,7 @@ def sync_receipt(doctype, name):
 		payload = build_receipt_payload(doc, invc_no)
 		data = etims_request(
 			doc.company,
-			"saveTrnsSalesOsdc",
+			"sendSalesTransaction",
 			payload=payload,
 			method="POST",
 			branch=branch,
@@ -140,10 +144,13 @@ def sync_receipt(doctype, name):
 
 
 def _apply_success(doc, invc_no, data, settings, branch):
-	"""Store KRA's confirmed saveTrnsSalesOsdc response shape and generate
-	the receipt QR code. Field names and the verification-URL formula are
-	from navariltd/kenya-compliance's actual (sandbox-tested) implementation,
-	not guessed - replaces what used to be a raw-JSON dump with no QR code."""
+	"""Store sendSalesTransaction's response and generate the receipt QR code.
+	Field names and the verification-URL formula are from navariltd/kenya-
+	compliance's actual (sandbox-tested) implementation against the *other*
+	endpoint name - not re-confirmed against GavaConnect's docs (that page's
+	Response Body section wasn't readable in the copy fetched 2026-09-05).
+	Best available guess, not a confirmed fact - verify against the first
+	real response this endpoint returns."""
 	info = data.get("data") or {}
 	receipt_signature = info.get("rcptSign")
 

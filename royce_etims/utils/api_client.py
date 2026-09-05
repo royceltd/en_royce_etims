@@ -7,12 +7,19 @@ Every business endpoint (saveItem, saveTrnsSalesOsdc, selectInitOsdcInfo, ...)
 should go through `request()` here rather than calling `requests` directly, so
 that the standard headers and eTIMS Log entries stay in one place.
 
-No OAuth/bearer-token layer: confirmed against two independent sources (KRA's
-own OSCU Specification Document v2.0, and navariltd/kenya-compliance - tested
-against the real KRA sandbox in 2024) that the actual API authenticates with
-tin/bhfId/cmcKey headers only. See docs/architecture.md for the full
-correction history - this replaced an earlier Apigee-OAuth design modeled on
-a Postman collection that turned out to target a different host entirely.
+Headers are tin/bhfId/cmcKey only - matches GavaConnect's own documented
+"Common Headers for all Basic Data Management APIs" (developer.go.ke/apis/
+KRA-ETIMS-SBX, read 2026-09-05), which lists exactly these three and no
+Authorization/Bearer header. NOT fully settled though: GavaConnect requires
+a mandatory "App creation" step before you can call anything, which is how
+Apigee-fronted APIs normally gate access via an OAuth client-credentials
+token (the original Postman collection this app was first built from has
+exactly that flow) - so a gateway-level Bearer token on top of these three
+headers is a real possibility, not ruled out, just not yet confirmed as
+required. If a live sandbox call gets rejected for missing auth despite
+correct tin/bhfId/cmcKey, that OAuth layer is almost certainly why - see
+docs/architecture.md for the full, twice-reversed correction history before
+changing this again.
 """
 
 import json

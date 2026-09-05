@@ -83,10 +83,11 @@ def _receipt_fields(insert_after):
 			"default": "0",
 			"insert_after": "etims_error",
 		},
-		# Fields below hold KRA's actual saveTrnsSalesOsdc response, per its
-		# confirmed shape: response["data"] = {rcptSign, curRcptNo, totRcptNo,
-		# intrlData, sdcDateTime}. Ground truth: navari's kenya-compliance
-		# (tested against the KRA sandbox in 2024), not a guess.
+		# Fields below hold KRA's sendSalesTransaction response, per its
+		# assumed shape: response["data"] = {rcptSign, curRcptNo, totRcptNo,
+		# intrlData, sdcDateTime}. Source: navari's kenya-compliance (tested
+		# against the KRA sandbox in 2024) - for the *other* endpoint name,
+		# not re-confirmed against this one. See docs/architecture.md.
 		{
 			"fieldname": "etims_receipt_section",
 			"fieldtype": "Section Break",
