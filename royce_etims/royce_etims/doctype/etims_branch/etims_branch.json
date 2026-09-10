@@ -18,7 +18,9 @@
   "cmc_key",
   "registered_on",
   "last_invoice_no",
-  "sdc_id"
+  "sdc_id",
+  "dvc_id",
+  "mrc_no"
  ],
  "fields": [
   {
@@ -97,6 +99,20 @@
    "fieldname": "sdc_id",
    "fieldtype": "Data",
    "label": "SDC ID",
+   "read_only": 1
+  },
+  {
+   "description": "Device ID assigned by KRA, returned alongside cmcKey/sdcId at registration.",
+   "fieldname": "dvc_id",
+   "fieldtype": "Data",
+   "label": "Device ID (dvcId)",
+   "read_only": 1
+  },
+  {
+   "description": "Machine Registration Certificate number, returned alongside cmcKey/sdcId at registration.",
+   "fieldname": "mrc_no",
+   "fieldtype": "Data",
+   "label": "MRC No",
    "read_only": 1
   }
  ],

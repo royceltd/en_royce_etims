@@ -185,9 +185,63 @@ provisioning a device ahead of/independent from a successful `/initialize` call 
 this doc previously assumed `/initialize` was the trigger for device provisioning, not just a
 confirmation of provisioning that happens elsewhere in KRA's process.
 
-**Next concrete step: create an App on the GavaConnect developer portal** (`developer.go.ke` →
-presumably "My Apps" or similar, subscribed to the eTIMS OSCU product) to get a real Consumer
-Key/Secret - this is `royce_etims`'s next hard blocker, not a code problem.
+**RESOLVED, 2026-09-10, final update: the OAuth layer works end-to-end. Root cause was our own
+code, not credentials.** After real Consumer Key/Secret were obtained, the token endpoint kept
+failing - initially blamed on the credentials being swapped (`key`/`secret` labels the taxpayer
+gave did turn out reversed relative to a working reference script found at
+`resources/KRA_eTIMS_OSCU/`), but fixing that *still* didn't work. Two real, separate bugs were
+layered on top of each other:
+
+1. **The doctype schema for the new GavaConnect fields was never migrated into the database** -
+   `eTIMS Settings.gavaconnect_consumer_key`/`_secret` existed in the `.json` file and could be set
+   as a plain Python attribute (Frappe's `Document` doesn't validate attribute assignment against
+   the meta), so `.save()` appeared to succeed and even worked *within the same process* - but
+   never actually persisted, and a fresh session couldn't even see the field
+   (`AttributeError`). `bench migrate` was failing outright (`redis_cache is not running` in this
+   dev environment) so the schema sync never happened. Fixed with `bench reload-doctype` per
+   doctype (a lighter sync than full `migrate`, doesn't need the redis-dependent steps) plus a
+   manual `ALTER TABLE` for `eTIMS Branch`'s `dvc_id`/`mrc_no` columns added the same session.
+2. **`_get_access_token()` sent `POST`, not `GET`.** This was the actual, sole reason every real
+   token request failed, including *after* the credential-order and schema issues were both fixed.
+   All the extensive request-shape debugging earlier in this correction (form body vs query params,
+   `scope` parameter, Content-Type headers) was chasing symptoms of this one line - `_do_request(
+   "POST", token_url, ...)` should have been `"GET"` from the start, matching the original Postman
+   collection and the reference script the whole time.
+
+**Verified working, for real, end to end:** `_get_access_token()` now returns a genuine token
+(`{"access_token": "...", "expires_in": "3599"}`) from `GET https://sbx.kra.go.ke/v1/token/generate
+?grant_type=client_credentials`. A live call to `selectCodeList` (Bearer token + `tin`/`bhfId`/
+`cmcKey` together, the full stack) returned real KRA taxation-type reference data:
+`A=Exempt, B=VAT 16%, C=Zero Rated, E=VAT 8%` - note the "E" code (8% VAT) wasn't previously known;
+worth reconciling against `eTIMS Taxation Type`'s seed data.
+
+**New response-shape finding along the way:** KRA's gateway sometimes returns HTTP 400 even for a
+well-formed, successfully-authenticated business response - e.g. `resultCd "001"` ("There is no
+search result") for a `selectCodeList` call with a date filter that matched nothing came back as
+HTTP 400 with a completely valid, parseable JSON body (`responseHeader.responseCode: 200` inside
+that same "failed" response, oddly). `api_client.request()`'s `not response.ok` check currently
+throws unconditionally on non-2xx status without inspecting whether the body is actually a
+well-formed KRA business response - worth revisiting so a legitimate "no data found" doesn't read
+as a hard failure to callers.
+
+**Also confirmed for real (fixed the same session, independently of the OAuth debugging):**
+`register_device()`'s and `api_client.py`'s generic response-parsing both expected the wrong shape
+- the real successful `/initialize` response nests the business payload inside a `"responseBody"`
+key (`responseBody.data.info.{cmcKey,sdcId,dvcId,mrcNo}`), one level deeper than the prior
+(unverified) guess. Both now check `responseBody` first, falling back to the flat shape for
+endpoints not yet confirmed. `eTIMS Branch` gained `dvc_id`/`mrc_no` fields to hold values KRA
+returns that the doctype had no home for.
+
+**`eTIMS Branch: Royce Technologies LTD-02` is now genuinely `Registered`** - `cmcKey`, `sdcId`
+(`KRACU0400001224`, cross-verified against KRA's independent SMS), `dvcId` (`451100`), `mrcNo`
+(`KRA00379709`) all recorded, sourced from a real successful `/initialize` call run via a
+standalone script (`resources/KRA_eTIMS_OSCU/`, not this app) rather than re-triggered live here,
+per that script's own caution against re-registering an already-initialized device.
+
+~~Next concrete step: create an App on the GavaConnect developer portal~~ - **done**, and the whole
+auth stack is now confirmed working end to end (see above). Next real step is building out the
+actual business endpoints (`sendSalesTransaction` first) against this now-proven transport layer,
+and reconciling `eTIMS Taxation Type`'s seed data against the real code list confirmed above.
 
 **The real onboarding process is much heavier than this doc previously assumed** - see the revised
 step list below. It's not "register device, get cmcKey, start signing" - there's automated app
@@ -299,11 +353,20 @@ just a config change.
 - **Self-integrator vs certified third-party integrator** (added 2026-09-05, see the correction
   above) - the single biggest unresolved question for the "easier client onboarding" goal. Needs a
   business decision, not a code change; CTO recommendation is third-party integrator, for scale.
-- ~~Whether the GavaConnect Apigee OAuth layer is required~~ - **confirmed yes**, 2026-09-10 (see
-  the correction above). Now blocked on getting a real Consumer Key/Secret from a GavaConnect App.
-- `/initialize` and `sendSalesTransaction`'s exact response envelopes are not re-confirmed against
-  GavaConnect's own docs (their Response Body sections weren't readable in the copy fetched) -
-  still running on kenya-compliance's shape as a best guess. Verify against the first real response.
+- ~~Whether the GavaConnect Apigee OAuth layer is required~~ - **confirmed yes, and now working end
+  to end**, 2026-09-10 (see the correction above) - real token fetch, real `/initialize` result, real
+  `selectCodeList` data all confirmed.
+- `sendSalesTransaction`'s exact response envelope is still NOT confirmed for real (unlike
+  `/initialize` and `selectCodeList`, both now verified against genuine responses this session) -
+  still running on kenya-compliance's shape as a best guess in `receipt.py`. Verify against the
+  first real signed receipt rather than assuming it matches `/initialize`'s now-confirmed shape.
+- KRA's gateway returned HTTP 400 for a well-formed, fully-authenticated "no data found" business
+  response (`resultCd "001"`) during this session's testing - `api_client.request()`'s blanket
+  `not response.ok` throw doesn't distinguish that from a real failure. Worth softening once more
+  endpoints are exercised for real and the pattern is better understood.
+- `eTIMS Taxation Type`'s seeded rates should be reconciled against the real `selectCodeList`
+  response confirmed this session (`A=Exempt, B=16%, C=Zero Rated, E=8%`) - the "E" code wasn't
+  previously known.
 - Production base URL for GavaConnect is not confirmed at all - `PRODUCTION_BASE_URL` is
   deliberately left empty in `utils/config.py` rather than guessed.
 - Whether `etims-api-sbx.kra.go.ke` (the abandoned second correction's host) is a dead end, a

@@ -109,8 +109,14 @@ def _get_access_token(settings):
 			_("GavaConnect token URL is not configured for the {0} environment yet.").format(settings.environment)
 		)
 
+	# GET, not POST - confirmed 2026-09-10 against the real gateway: POST
+	# returns a 200 with an empty or echoed body (never a real token), GET
+	# returns the genuine {access_token, expires_in} response. Matches the
+	# original Postman collection's method and a real successful run
+	# (resources/KRA_eTIMS_OSCU) - this was the one thing that never actually
+	# got fixed here despite extensive request-shape debugging elsewhere.
 	response = _do_request(
-		"POST",
+		"GET",
 		token_url,
 		params={"grant_type": "client_credentials"},
 		auth=(consumer_key, consumer_secret),
@@ -212,13 +218,16 @@ def request(
 	if not response.ok:
 		frappe.throw(_("eTIMS call to {0} failed ({1}): {2}").format(endpoint, response.status_code, data or response.text))
 
-	# resultCd "000" = success - confirmed against kenya-compliance's actual
-	# response handling (not a guess, unlike the earlier version of this check).
-	result_cd = data.get("resultCd") if isinstance(data, dict) else None
+	# resultCd "000" = success. The real business payload is wrapped in
+	# "responseBody" (confirmed 2026-09-10 from a genuine successful call) -
+	# falls back to checking the top level directly if that key is absent,
+	# since this isn't yet confirmed as universal across every endpoint.
+	body = data.get("responseBody", data) if isinstance(data, dict) else {}
+	result_cd = body.get("resultCd") if isinstance(body, dict) else None
 	if result_cd is not None and result_cd != "000":
 		frappe.throw(
 			_("eTIMS rejected the request to {0}: {1}").format(
-				endpoint, data.get("resultMsg") or data
+				endpoint, body.get("resultMsg") or data
 			)
 		)
 

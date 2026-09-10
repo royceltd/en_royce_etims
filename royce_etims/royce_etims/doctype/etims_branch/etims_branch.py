@@ -40,11 +40,17 @@ class eTIMSBranch(Document):
 		https://sbx.kra.go.ke/etims-oscu/api/v1/initialize - see
 		docs/architecture.md for the full correction history.
 
-		Response shape (response["data"]["info"] = {cmcKey, sdcId}) is NOT
-		re-confirmed against GavaConnect's docs (that page's Response Body
-		section wasn't readable in the copy fetched) - still carried over from
-		navariltd/kenya-compliance's tested shape as the best available guess.
-		Treat this as the first thing to verify once a real call succeeds.
+		Response shape CONFIRMED 2026-09-10 from a real successful sandbox call:
+		{"responseHeader": {...}, "responseBody": {"resultCd": "000", "data":
+		{"info": {tin, bhfId, dvcId, sdcId, mrcNo, cmcKey, ...}}}} - nested
+		one level deeper than the prior guess (which lacked the "responseBody"
+		wrapper, carried over from kenya-compliance and never actually
+		verified). A gateway-level error (e.g. the 401 "Unauthorised-Invalid
+		Access Token" this app hit before getting real credentials) uses a
+		different, flatter "header"/"body" shape instead - see
+		docs/architecture.md. Handled defensively: falls back to the
+		unwrapped shape if "responseBody" isn't present, rather than assuming
+		either is universal across every endpoint.
 
 		No `branch` is passed to etims_request() here on purpose: the cmcKey
 		doesn't exist yet, so there are no tin/bhfId/cmcKey headers to send -
@@ -69,7 +75,8 @@ class eTIMSBranch(Document):
 			reference_name=self.name,
 		)
 
-		info = (data or {}).get("data", {}).get("info", {})
+		body = (data or {}).get("responseBody") or data or {}
+		info = (body.get("data") or {}).get("info", {})
 		cmc_key = info.get("cmcKey")
 		if not cmc_key:
 			frappe.throw(
@@ -78,6 +85,8 @@ class eTIMSBranch(Document):
 
 		self.db_set("cmc_key", cmc_key, notify=False)
 		self.db_set("sdc_id", info.get("sdcId"), notify=False)
+		self.db_set("dvc_id", info.get("dvcId"), notify=False)
+		self.db_set("mrc_no", info.get("mrcNo"), notify=False)
 		self.db_set("device_status", "Registered", notify=False)
 		self.db_set("registered_on", now_datetime(), notify=False)
 
