@@ -238,6 +238,17 @@ returns that the doctype had no home for.
 standalone script (`resources/KRA_eTIMS_OSCU/`, not this app) rather than re-triggered live here,
 per that script's own caution against re-registering an already-initialized device.
 
+**A second, different endpoint confirmed the same session: `selectBhfList`.** Real data back,
+`responseCd: "000"`, listing branch `02` with our actual company/manager details - an independent
+cross-check that the registration is consistent, not a fluke of `/initialize`/`selectCodeList`
+specifically. One genuine surprise: the list also includes `bhfId 00` and `01`, both flagged
+`hqYn: "Y"` (head office) with identical details to `02` - `00` was our abandoned "Device Serial
+Number already used" attempt, `01` was never touched by this app at all. Either KRA's sandbox
+auto-provisions placeholder branch records per taxpayer regardless of which registration actually
+succeeded, or something registered those outside this app - not investigated further, and not a
+problem for `royce_etims` (correctly scoped to `02` throughout), but worth knowing before assuming
+`selectBhfList`'s branch count means "N real registered devices."
+
 ~~Next concrete step: create an App on the GavaConnect developer portal~~ - **done**, and the whole
 auth stack is now confirmed working end to end (see above). Next real step is building out the
 actual business endpoints (`sendSalesTransaction` first) against this now-proven transport layer,
