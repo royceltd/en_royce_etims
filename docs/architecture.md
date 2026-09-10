@@ -114,6 +114,20 @@ collide (someone else's sandbox test, a stale prior attempt, shared demo hardwar
 Branch.validate()` now auto-generates one (`ROYCEERP-<tin>-<sequence>`) if left blank, matching
 Odoo's scheme, rather than asking for a real machine serial.
 
+**Resolution, 2026-09-10 (revises the theory above): the uniqueness constraint is more likely on
+the (bhfId, dvcSrlNo) *pair*, not the serial alone.** KRA support's fix for the "Device Serial
+Number already used" error was not a new serial - it was a different **branch ID**. `bhfId 00` +
+`dvcSrlNo 5CD6472Z8WR` collided; `bhfId 02` + the *same* serial did not. The serial itself was
+never disputed. Practical implication: `bhfId "00"` (the conventional head-office/single-branch
+default this doc and `eTIMS Branch` both assumed was safe) may itself be collision-prone in KRA's
+shared sandbox pool precisely *because* it's the conventional default - most applicants naturally
+pick it. Worth NOT hardcoding `"00"` as a suggested default in any future onboarding UI without
+checking this assumption; `royce_etims`'s own registration now uses `bhfId "02"` for
+`Royce Technologies LTD` (record: `eTIMS Branch: Royce Technologies LTD-02`), device serial
+`5CD6472Z8WR` unchanged. Still `device_status = Not Registered` - this only fixes the Service
+Request submission, not device registration itself, which still depends on that request being
+approved. `/initialize` has not yet been called for real.
+
 **The real onboarding process is much heavier than this doc previously assumed** - see the revised
 step list below. It's not "register device, get cmcKey, start signing" - there's automated app
 testing with uploaded artefacts, a full KYC document set, a scheduled joint verification demo with
