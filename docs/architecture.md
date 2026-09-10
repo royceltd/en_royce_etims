@@ -154,6 +154,37 @@ Two things this confirms outright, no longer inferred:
   envelope shape for *errors* (`header.responseMessage/responseCode/customerMessage/requestRefId`
   + empty `body`) is now confirmed for real, though - useful for handling failures elsewhere too.
 
+**Update 2026-09-10, later same day: real GavaConnect credentials obtained, token endpoint still not
+issuing real tokens.** Consumer Key/Secret received and saved to `eTIMS Settings`. Testing the token
+exchange against `https://sbx.kra.go.ke/v1/token/generate` - including reproducing the *exact*
+request shape a known-working third-party GavaConnect SDK uses (`ImSidow/GavaBridge`: GET, Basic
+auth, `grant_type=client_credentials` + empty `scope` as query params) - consistently fails to
+return a real token:
+
+| Request shape | Result |
+|---|---|
+| POST, query params | `200`, zero-byte body |
+| POST, form-encoded body | `200`, body is a literal **echo** of what was sent |
+| GET, query params (matches GavaBridge exactly) | `400`, empty body |
+
+A sanity check against `/initialize` in the same script, same run, got the normal real KRA 401 -
+confirming this isn't a network/environment problem, it's specific to this credential/App against
+this endpoint. Most likely explanation, not yet confirmed: the App isn't subscribed to the eTIMS
+OSCU product on the GavaConnect dashboard, isn't yet Active/Approved, or these are the wrong
+environment's credentials (Production tried against the Sandbox token URL or vice versa) - needs
+checking on the portal's "My Apps" page, not further guessing at request shapes.
+
+**Also this session: KRA independently confirmed device assignment**, outside our API entirely - a
+message reporting *"The device for ROYCE TECHNOLOGIES LIMITED (Branch 02) is assigned
+KRACU0400001224."* `KRACU...` matches the `sdcId` shape our own `/initialize` response was expected
+to return. Recorded on `eTIMS Branch: Royce Technologies LTD-02`.`sdc_id` directly (with a comment
+noting the source), since it's a confirmed fact reported by KRA, not a guess - but `device_status`
+was deliberately left at `Not Registered`, since that field specifically means *our own* API
+round-trip completed with a `cmcKey`, which still hasn't happened. Worth noting: KRA's backend
+provisioning a device ahead of/independent from a successful `/initialize` call is new information -
+this doc previously assumed `/initialize` was the trigger for device provisioning, not just a
+confirmation of provisioning that happens elsewhere in KRA's process.
+
 **Next concrete step: create an App on the GavaConnect developer portal** (`developer.go.ke` →
 presumably "My Apps" or similar, subscribed to the eTIMS OSCU product) to get a real Consumer
 Key/Secret - this is `royce_etims`'s next hard blocker, not a code problem.
