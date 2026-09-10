@@ -33,17 +33,17 @@ unset - nothing in what's been read so far confirms the production host, and
 guessing wrong here is worse than throwing loudly (see api_client.py's
 get_base_url, which already throws if this is empty).
 
-Auth: GavaConnect's own "Common Headers for all Basic Data Management APIs"
-table lists only tin/bhfId/cmcKey - no Bearer token mentioned at the business-
-payload level. Whether an Apigee/GavaConnect OAuth token (the original
-collection's /v1/token/generate flow) is ALSO required as a gateway-level
-layer on top of that is not confirmed either way - "App creation" is a
-mandatory portal step before testing, which suggests it might be, but the
-"Integration Token" the taxpayer received turned out to belong to a
-different, unrelated step (the eTIMS Taxpayer Portal's Service Request form,
-gating device registration - not a GavaConnect app credential at all). Left
-out of api_client.py until an actual call confirms whether it's needed -
-see that module's docstring.
+Auth: CONFIRMED 2026-09-10 - a live call to /initialize with correct tin/
+bhfId/dvcSrlNo and no Authorization header got back a clean, real KRA
+response: HTTP 401, {"responseMessage": "Unauthorised-Invalid Access
+Token", "responseCode": 401, ...}. So the Apigee/GavaConnect OAuth layer
+(the original collection's /v1/token/generate client-credentials flow) IS
+required on top of tin/bhfId/cmcKey, not just a theoretical possibility.
+TOKEN_URL below is that endpoint. Getting an actual token needs a Consumer
+Key/Secret from an App created on the GavaConnect developer portal
+(developer.go.ke) subscribed to the eTIMS OSCU product - a separate step
+from the eTIMS Taxpayer Portal's Service Request/Integration Token, and not
+yet done as of this correction. See docs/architecture.md.
 
 QR_VERIFY_BASE_URL is the public receipt-verification host a signed
 receipt's QR code links to - a third, distinct KRA host (confirmed from
@@ -56,6 +56,12 @@ reasonable inference, not a verified fact, until checked.
 
 SANDBOX_BASE_URL = "https://sbx.kra.go.ke/etims-oscu/api/v1"
 PRODUCTION_BASE_URL = ""  # Not yet confirmed - see module docstring. get_base_url() throws rather than guess.
+
+# Same host as SANDBOX_BASE_URL, different path - confirmed by the original
+# Postman collection's "Access Token" request, not yet independently
+# re-confirmed against GavaConnect's own docs the way the base URL was.
+SANDBOX_TOKEN_URL = "https://sbx.kra.go.ke/v1/token/generate"
+PRODUCTION_TOKEN_URL = ""  # Not yet confirmed - same reasoning as PRODUCTION_BASE_URL.
 
 SANDBOX_QR_VERIFY_BASE_URL = (
 	"https://etims-sbx.kra.go.ke/common/link/etims/receipt/indexEtimsReceiptData"

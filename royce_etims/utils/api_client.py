@@ -3,23 +3,27 @@
 
 """Generic authenticated client for the KRA eTIMS OSCU API.
 
-Every business endpoint (saveItem, saveTrnsSalesOsdc, selectInitOsdcInfo, ...)
+Every business endpoint (saveItem, sendSalesTransaction, initialize, ...)
 should go through `request()` here rather than calling `requests` directly, so
 that the standard headers and eTIMS Log entries stay in one place.
 
-Headers are tin/bhfId/cmcKey only - matches GavaConnect's own documented
-"Common Headers for all Basic Data Management APIs" (developer.go.ke/apis/
-KRA-ETIMS-SBX, read 2026-09-05), which lists exactly these three and no
-Authorization/Bearer header. NOT fully settled though: GavaConnect requires
-a mandatory "App creation" step before you can call anything, which is how
-Apigee-fronted APIs normally gate access via an OAuth client-credentials
-token (the original Postman collection this app was first built from has
-exactly that flow) - so a gateway-level Bearer token on top of these three
-headers is a real possibility, not ruled out, just not yet confirmed as
-required. If a live sandbox call gets rejected for missing auth despite
-correct tin/bhfId/cmcKey, that OAuth layer is almost certainly why - see
-docs/architecture.md for the full, twice-reversed correction history before
-changing this again.
+Two auth layers, confirmed 2026-09-10 by an actual live call (see
+docs/architecture.md, and utils/config.py's docstring for the full,
+twice-reversed correction history before touching this again):
+
+1. tin/bhfId/cmcKey headers - matches GavaConnect's own documented "Common
+   Headers for all Basic Data Management APIs".
+2. A GavaConnect/Apigee OAuth Bearer token on top of that - a live call to
+   /initialize with correct tin/bhfId/dvcSrlNo and no Authorization header
+   got back a clean 401 "Unauthorised-Invalid Access Token" from KRA's real
+   sandbox. Not a guess anymore.
+
+The token comes from eTIMS Settings.gavaconnect_consumer_key/_secret (from
+an App created on the GavaConnect developer portal, a separate step from
+device registration - see docs/architecture.md). If those are blank, request()
+still sends the call without an Authorization header rather than blocking -
+it'll fail with the same 401 either way, which is more informative than a
+local error for a company that hasn't gotten GavaConnect credentials yet.
 """
 
 import json
@@ -29,9 +33,19 @@ import requests
 from frappe import _
 from frappe.model.document import Document
 
-from royce_etims.utils.config import PRODUCTION_BASE_URL, SANDBOX_BASE_URL
+from royce_etims.utils.config import (
+	PRODUCTION_BASE_URL,
+	PRODUCTION_TOKEN_URL,
+	SANDBOX_BASE_URL,
+	SANDBOX_TOKEN_URL,
+)
 
 REQUEST_TIMEOUT_SECONDS = 60
+# Conservative default if KRA's token response doesn't include expires_in -
+# Apigee's usual default is 3600s; refresh early rather than risk a call
+# failing mid-flight on an expired token.
+DEFAULT_TOKEN_TTL_SECONDS = 3000
+TOKEN_REFRESH_MARGIN_SECONDS = 60
 
 
 def get_settings(company):
@@ -59,6 +73,71 @@ def get_base_url(settings):
 		return PRODUCTION_BASE_URL
 
 	frappe.throw(_("Unknown eTIMS environment: {0}").format(settings.environment))
+
+
+def get_token_url(settings):
+	if settings.environment == "Sandbox":
+		return SANDBOX_TOKEN_URL
+	if settings.environment == "Production":
+		return PRODUCTION_TOKEN_URL
+	return None
+
+
+def _get_access_token(settings):
+	"""Fetch (and cache) a GavaConnect Bearer token via OAuth2 client_credentials.
+
+	Returns None - not an error - if no Consumer Key/Secret is configured yet,
+	so a company without GavaConnect credentials still gets KRA's own 401
+	rather than a local validation error masking the same underlying problem.
+	"""
+	consumer_key = settings.gavaconnect_consumer_key
+	consumer_secret = settings.get_password("gavaconnect_consumer_secret", raise_exception=False)
+	if not consumer_key or not consumer_secret:
+		return None
+
+	cache_key = f"royce_etims:gavaconnect_token:{settings.company}"
+	try:
+		cached = frappe.cache().get_value(cache_key)
+		if cached:
+			return cached
+	except Exception:
+		pass  # cache unavailable - fetch a fresh token instead of failing the call over it
+
+	token_url = get_token_url(settings)
+	if not token_url:
+		frappe.throw(
+			_("GavaConnect token URL is not configured for the {0} environment yet.").format(settings.environment)
+		)
+
+	response = _do_request(
+		"POST",
+		token_url,
+		params={"grant_type": "client_credentials"},
+		auth=(consumer_key, consumer_secret),
+	)
+	try:
+		data = response.json()
+	except ValueError:
+		data = {}
+
+	if not response.ok:
+		frappe.throw(
+			_("Could not get a GavaConnect access token for {0} ({1}): {2}").format(
+				settings.company, response.status_code, data or response.text
+			)
+		)
+
+	token = data.get("access_token")
+	if not token:
+		frappe.throw(_("GavaConnect token response had no access_token: {0}").format(data))
+
+	ttl = int(data.get("expires_in") or DEFAULT_TOKEN_TTL_SECONDS) - TOKEN_REFRESH_MARGIN_SECONDS
+	try:
+		frappe.cache().set_value(cache_key, token, expires_in_sec=max(ttl, 60))
+	except Exception:
+		pass  # caching is an optimisation, not a requirement - a cache miss just means fetching again next call
+
+	return token
 
 
 def _do_request(method, url, **kwargs):
@@ -92,6 +171,10 @@ def request(
 	base_url = get_base_url(settings)
 
 	headers = {"Content-Type": "application/json"}
+
+	access_token = _get_access_token(settings)
+	if access_token:
+		headers["Authorization"] = f"Bearer {access_token}"
 
 	branch_doc = None
 	if branch:

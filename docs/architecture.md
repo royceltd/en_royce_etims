@@ -128,6 +128,36 @@ checking this assumption; `royce_etims`'s own registration now uses `bhfId "02"`
 Request submission, not device registration itself, which still depends on that request being
 approved. `/initialize` has not yet been called for real.
 
+**First live round-trip, 2026-09-10: the OAuth question is now confirmed, not theoretical.** Once
+the Service Request cleared (SMS received) and `bhfId 02` was live on `eTIMS Branch`,
+`register_device()` was actually called against `https://sbx.kra.go.ke/etims-oscu/api/v1/initialize`
+for real - the first genuine request this integration has ever made against KRA. Result: a clean,
+well-formed HTTP 401 from KRA's real server:
+
+```json
+{"header": {"responseMessage": "Unauthorised-Invalid Access Token", "responseCode": 401,
+  "customerMessage": "Unauthorised-Invalid Access Token", "requestRefId": "...", "timestamp": "..."},
+ "body": {}}
+```
+
+Two things this confirms outright, no longer inferred:
+- **Base URL and endpoint path are right.** This isn't a 404 or a connection failure - it's KRA's
+  gateway responding coherently, meaning the request reached the correct, real endpoint.
+- **The GavaConnect OAuth Bearer-token layer is required**, not just plausible. `utils/config.py`
+  and `utils/api_client.py` now implement it: `eTIMS Settings.gavaconnect_consumer_key` /
+  `gavaconnect_consumer_secret` (new fields, both blank until an App is created on the GavaConnect
+  developer portal), a `_get_access_token()` that does the `/v1/token/generate` client_credentials
+  exchange and caches the result, and a Bearer header added to every `request()` call when
+  configured. **Not yet tested with real credentials** - the exact mechanics (URL, grant_type param,
+  Basic-Auth-with-key/secret) are still carried over from the original Postman collection, not
+  independently re-confirmed against GavaConnect's docs the way the base URL was. The response
+  envelope shape for *errors* (`header.responseMessage/responseCode/customerMessage/requestRefId`
+  + empty `body`) is now confirmed for real, though - useful for handling failures elsewhere too.
+
+**Next concrete step: create an App on the GavaConnect developer portal** (`developer.go.ke` →
+presumably "My Apps" or similar, subscribed to the eTIMS OSCU product) to get a real Consumer
+Key/Secret - this is `royce_etims`'s next hard blocker, not a code problem.
+
 **The real onboarding process is much heavier than this doc previously assumed** - see the revised
 step list below. It's not "register device, get cmcKey, start signing" - there's automated app
 testing with uploaded artefacts, a full KYC document set, a scheduled joint verification demo with
@@ -238,8 +268,8 @@ just a config change.
 - **Self-integrator vs certified third-party integrator** (added 2026-09-05, see the correction
   above) - the single biggest unresolved question for the "easier client onboarding" goal. Needs a
   business decision, not a code change; CTO recommendation is third-party integrator, for scale.
-- Whether the GavaConnect Apigee OAuth layer (a Bearer token on top of tin/bhfId/cmcKey) is
-  actually required - unconfirmed both ways. First thing to check once any live call is attempted.
+- ~~Whether the GavaConnect Apigee OAuth layer is required~~ - **confirmed yes**, 2026-09-10 (see
+  the correction above). Now blocked on getting a real Consumer Key/Secret from a GavaConnect App.
 - `/initialize` and `sendSalesTransaction`'s exact response envelopes are not re-confirmed against
   GavaConnect's own docs (their Response Body sections weren't readable in the copy fetched) -
   still running on kenya-compliance's shape as a best guess. Verify against the first real response.

@@ -12,6 +12,10 @@
   "environment",
   "status",
   "default_branch",
+  "gavaconnect_section",
+  "gavaconnect_consumer_key",
+  "column_break_gavaconnect",
+  "gavaconnect_consumer_secret",
   "sign_section",
   "sign_pos_invoices",
   "sign_sales_invoices"
@@ -57,6 +61,26 @@
    "fieldtype": "Link",
    "label": "Default Branch (for company-wide submissions)",
    "options": "eTIMS Branch"
+  },
+  {
+   "fieldname": "gavaconnect_section",
+   "fieldtype": "Section Break",
+   "label": "GavaConnect App Credentials",
+   "description": "Confirmed 2026-09-10: /initialize rejects with 401 'Unauthorised-Invalid Access Token' without these. From an App created on the GavaConnect developer portal (developer.go.ke) subscribed to the eTIMS OSCU product - a separate step from the eTIMS Taxpayer Portal's Service Request/Integration Token. See docs/architecture.md."
+  },
+  {
+   "fieldname": "gavaconnect_consumer_key",
+   "fieldtype": "Data",
+   "label": "Consumer Key"
+  },
+  {
+   "fieldname": "column_break_gavaconnect",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "gavaconnect_consumer_secret",
+   "fieldtype": "Password",
+   "label": "Consumer Secret"
   },
   {
    "fieldname": "sign_section",
