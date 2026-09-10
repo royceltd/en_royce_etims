@@ -2,6 +2,11 @@
 
 Generate etims compliant invoices
 
+### Documentation
+
+- [OSCU Integration Guide](docs/oscu-integration-guide.md) — how to initialize a device and make authenticated eTIMS calls (start here)
+- [Architecture Reference](docs/architecture.md) — the full decision log and correction history
+
 ### Installation
 
 You can install this app using the [bench](https://github.com/frappe/bench) CLI:

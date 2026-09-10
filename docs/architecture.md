@@ -5,6 +5,12 @@ Invoice + gated Sales Invoice) are implemented. Captures the decisions made so f
 re-litigate them. Update this file as decisions change — it's meant to stay current, not to be a
 one-time snapshot.
 
+**Looking for how to actually initialize a device or make an authenticated call?** See
+[`oscu-integration-guide.md`](./oscu-integration-guide.md) — that's the operating manual (settled,
+current steps). This file is the decision log (why things are built this way, and the sometimes
+painful history of how each piece got confirmed) — read it when you need the reasoning, not when
+you just need to get something working.
+
 ## Critical correction: the original API surface was wrong
 
 The app was first built from `eTIMS-OSCU-Integrator-Automated-Testing-Sandbox.json`, a Postman
