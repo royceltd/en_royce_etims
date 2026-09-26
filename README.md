@@ -1,4 +1,4 @@
-### Royce Etims
+### KRA eTIMS (`royce_etims`)
 
 Generate etims compliant invoices
 

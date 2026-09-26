@@ -14,7 +14,7 @@ changes (drop Apigee fields, add sdc_id) sync automatically via the normal
 DocType migration - nothing to do here. Sales Invoice/POS Invoice's
 etims_raw_response was a Custom Field (this app doesn't own those doctypes),
 so it needs explicit removal the same way add_etims_reference_fields_to_item
-handled Item's etims_item_type - Custom Field sync only adds/updates, it
+handled Item's royce_etims_item_type - Custom Field sync only adds/updates, it
 never removes a field that's no longer in CUSTOM_FIELDS.
 """
 

@@ -334,7 +334,7 @@ informative:
 
 1. **`orgnNatCd cannot be null`** - Country of Origin, which this app had treated as optional
    (`REQUIRED_ETIMS_ITEM_FIELDS` didn't include it), is actually mandatory. **Fixed**:
-   `etims_sync/item.py` now requires `etims_origin_nation` too. Seeded `KE` (Kenya) as the one
+   `etims_sync/item.py` now requires `royce_etims_origin_nation` too. Seeded `KE` (Kenya) as the one
    `eTIMS Country of Origin` row needed to unblock this - same sample-only caveat as above.
 2. **`Invalid Headers apigee_app_id` / `apigee_app_id cannot be Null`** - confirms a header this app
    never sends at all is actually required for `saveItem` (previously assumed *not* required, since
@@ -403,7 +403,7 @@ to fix, not guessed:
    correct reading: the hint means the literal sequence integer, i.e. exactly `2` (as in `KE2NTBA
    00000002`) - meaning something (almost certainly the earlier standalone-script testing recorded
    elsewhere in this doc) already consumed sequence `1` on this device. **`saveItem` succeeded for
-   real** with `KE2NTBA00000002` - `ETIMS-INTEGRATION-TEST-001.etims_sync_status` is now genuinely
+   real** with `KE2NTBA00000002` - `ETIMS-INTEGRATION-TEST-001.royce_etims_sync_status` is now genuinely
    `Synced`. (One process note: the first successful call's local bookkeeping - sync_status, the
    eTIMS Log row - was lost because the console script that ran it never called
    `frappe.db.commit()`. The KRA-side registration was real and permanent regardless; only our own
@@ -582,7 +582,7 @@ just a config change.
     later without a schema change.
   - Tax rate for `sendSalesTransaction`'s `taxRtA..E` now comes live from `eTIMS Taxation Type`,
     replacing what was a hardcoded `TAX_RATE_BY_CODE` dict in `etims_sync/receipt.py`.
-  - `prevent_etims_submission` escape hatch added to Item, Sales Invoice, and POS Invoice.
+  - `royce_prevent_etims_submission` escape hatch added to Item, Sales Invoice, and POS Invoice.
 
 ## Open / not yet decided
 

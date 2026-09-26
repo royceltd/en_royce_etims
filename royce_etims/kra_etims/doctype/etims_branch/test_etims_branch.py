@@ -17,7 +17,7 @@ class IntegrationTesteTIMSBranch(IntegrationTestCase):
 	def test_autonames_company_dash_bhf_id(self):
 		branch = frappe.get_doc({"doctype": "Branch", "branch": "Test Branch HQ"}).insert()
 
-		etims_branch = frappe.get_doc(
+		royce_etims_branch = frappe.get_doc(
 			{
 				"doctype": "eTIMS Branch",
 				"company": TEST_COMPANY,
@@ -27,6 +27,6 @@ class IntegrationTesteTIMSBranch(IntegrationTestCase):
 			}
 		).insert()
 
-		self.assertEqual(etims_branch.name, f"{TEST_COMPANY}-00")
-		self.assertEqual(etims_branch.device_status, "Not Registered")
-		self.assertEqual(etims_branch.last_invoice_no, 0)
+		self.assertEqual(royce_etims_branch.name, f"{TEST_COMPANY}-00")
+		self.assertEqual(royce_etims_branch.device_status, "Not Registered")
+		self.assertEqual(royce_etims_branch.last_invoice_no, 0)

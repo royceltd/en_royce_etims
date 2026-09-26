@@ -138,13 +138,13 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 
 		_apply_success(doc, 1, data, settings, branch)
 
-		self.assertEqual(doc.etims_status, "Sent")
-		self.assertEqual(doc.etims_receipt_signature, "SIGN123")
-		self.assertEqual(doc.etims_current_receipt_number, 1)
-		self.assertEqual(doc.etims_total_receipt_number, 1)
-		self.assertEqual(doc.etims_internal_data, "INTERNAL")
-		self.assertEqual(doc.etims_control_unit_datetime, "20260910120000")
-		self.assertIn("SIGN123", doc.etims_qr_verification_url)
+		self.assertEqual(doc.royce_etims_status, "Sent")
+		self.assertEqual(doc.royce_etims_receipt_signature, "SIGN123")
+		self.assertEqual(doc.royce_etims_current_receipt_number, 1)
+		self.assertEqual(doc.royce_etims_total_receipt_number, 1)
+		self.assertEqual(doc.royce_etims_internal_data, "INTERNAL")
+		self.assertEqual(doc.royce_etims_control_unit_datetime, "20260910120000")
+		self.assertIn("SIGN123", doc.royce_etims_qr_verification_url)
 
 	def test_build_receipt_payload_uses_tax_inclusive_amounts(self):
 		"""CONFIRMED 2026-09-23 by a real sendSalesTransaction rejection against
@@ -157,7 +157,7 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 		# Settings doc (TEST_COMPANY has none by default - see the
 		# before_tests note above). Create one directly rather than
 		# ignore_links=True on the Item insert - that would also suppress
-		# etims_taxation_type's fetch_from resolution, silently defaulting
+		# royce_etims_taxation_type's fetch_from resolution, silently defaulting
 		# the tax code to "A" and defeating the point of this test (caught
 		# live while writing it: taxTyCd came back "A", not "B").
 		if not frappe.db.exists("eTIMS Settings", TEST_COMPANY):
@@ -173,8 +173,8 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 				"item_group": "All Item Groups",
 				"stock_uom": "Nos",
 				"is_stock_item": 0,
-				"etims_taxation_type": "B",  # 16% - seeded rate, confirmed real
-				"etims_id_mapping": [
+				"royce_etims_taxation_type": "B",  # 16% - seeded rate, confirmed real
+				"royce_etims_id_mapping": [
 					{"setup_doctype": "eTIMS Settings", "setup_docname": TEST_COMPANY, "etims_id": "TESTCD00000001"}
 				],
 			}
@@ -225,4 +225,4 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 
 		_apply_success(doc, 2, data, settings, branch)
 
-		self.assertEqual(doc.etims_receipt_signature, "SIGN456")
+		self.assertEqual(doc.royce_etims_receipt_signature, "SIGN456")

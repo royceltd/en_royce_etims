@@ -16,7 +16,7 @@ SETUP_DOCTYPE = "eTIMS Settings"
 
 def get_etims_id(doc, company):
 	"""Return the eTIMS ID for `doc` under `company`'s registration, or None."""
-	for row in doc.get("etims_id_mapping") or []:
+	for row in doc.get("royce_etims_id_mapping") or []:
 		if row.setup_doctype == SETUP_DOCTYPE and row.setup_docname == company and not row.disabled:
 			return row.etims_id
 	return None
@@ -29,12 +29,12 @@ def has_etims_id(doc, company):
 def set_etims_id(doc, company, etims_id):
 	"""Set (or update) the eTIMS ID for `doc` under `company`. Caller is
 	responsible for saving `doc` afterwards."""
-	for row in doc.get("etims_id_mapping") or []:
+	for row in doc.get("royce_etims_id_mapping") or []:
 		if row.setup_doctype == SETUP_DOCTYPE and row.setup_docname == company:
 			row.etims_id = etims_id
 			row.disabled = 0
 			return
 	doc.append(
-		"etims_id_mapping",
+		"royce_etims_id_mapping",
 		{"setup_doctype": SETUP_DOCTYPE, "setup_docname": company, "etims_id": etims_id},
 	)

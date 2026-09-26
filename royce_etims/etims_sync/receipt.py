@@ -76,7 +76,7 @@ def _get_tax_rates():
 def on_submit(doc, method=None):
 	"""doc_events hook for both Sales Invoice and POS Invoice on_submit.
 	Enqueues sync, never calls KRA inline."""
-	if doc.get("prevent_etims_submission"):
+	if doc.get("royce_prevent_etims_submission"):
 		return
 
 	if not frappe.db.exists("eTIMS Settings", doc.company):
@@ -90,7 +90,7 @@ def on_submit(doc, method=None):
 	if not sign_field or not settings.get(sign_field):
 		return
 
-	branch_name = doc.etims_branch or settings.default_branch
+	branch_name = doc.royce_etims_branch or settings.default_branch
 	if not branch_name:
 		frappe.throw(
 			_("eTIMS is Active for {0} but no eTIMS Branch is set on this document, and the company has no Default Branch configured.").format(
@@ -98,8 +98,8 @@ def on_submit(doc, method=None):
 			)
 		)
 
-	doc.db_set("etims_branch", branch_name, notify=False)
-	doc.db_set("etims_status", "Pending", notify=False)
+	doc.db_set("royce_etims_branch", branch_name, notify=False)
+	doc.db_set("royce_etims_status", "Pending", notify=False)
 
 	frappe.enqueue(
 		"royce_etims.etims_sync.receipt.sync_receipt",
@@ -112,12 +112,12 @@ def on_submit(doc, method=None):
 
 def sync_receipt(doctype, name):
 	doc = frappe.get_doc(doctype, name)
-	branch = frappe.get_doc("eTIMS Branch", doc.etims_branch)
+	branch = frappe.get_doc("eTIMS Branch", doc.royce_etims_branch)
 	settings = frappe.get_cached_doc("eTIMS Settings", doc.company)
 
 	if branch.device_status not in ("Registered", "Active"):
-		doc.db_set("etims_status", "Failed", notify=False)
-		doc.db_set("etims_error", _("eTIMS Branch {0} has no registered device.").format(branch.name), notify=False)
+		doc.db_set("royce_etims_status", "Failed", notify=False)
+		doc.db_set("royce_etims_error", _("eTIMS Branch {0} has no registered device.").format(branch.name), notify=False)
 		return
 
 	invc_no = _next_invoice_number(branch.name)
@@ -134,10 +134,10 @@ def sync_receipt(doctype, name):
 			reference_name=doc.name,
 		)
 	except Exception as e:
-		doc.db_set("etims_status", "Failed", notify=False)
-		doc.db_set("etims_error", str(e)[:140], notify=False)
-		doc.db_set("etims_invoice_number", invc_no, notify=False)  # number is consumed either way - never reused
-		doc.db_set("etims_retry_count", (doc.etims_retry_count or 0) + 1, notify=False)
+		doc.db_set("royce_etims_status", "Failed", notify=False)
+		doc.db_set("royce_etims_error", str(e)[:140], notify=False)
+		doc.db_set("royce_etims_invoice_number", invc_no, notify=False)  # number is consumed either way - never reused
+		doc.db_set("royce_etims_retry_count", (doc.royce_etims_retry_count or 0) + 1, notify=False)
 		frappe.db.commit()
 		return
 
@@ -162,14 +162,14 @@ def _apply_success(doc, invc_no, data, settings, branch):
 	info = body.get("data") or {}
 	receipt_signature = info.get("rcptSign")
 
-	doc.db_set("etims_status", "Sent", notify=False)
-	doc.db_set("etims_invoice_number", invc_no, notify=False)
-	doc.db_set("etims_error", "", notify=False)
-	doc.db_set("etims_receipt_signature", receipt_signature, notify=False)
-	doc.db_set("etims_current_receipt_number", info.get("curRcptNo"), notify=False)
-	doc.db_set("etims_total_receipt_number", info.get("totRcptNo"), notify=False)
-	doc.db_set("etims_internal_data", info.get("intrlData"), notify=False)
-	doc.db_set("etims_control_unit_datetime", info.get("sdcDateTime"), notify=False)
+	doc.db_set("royce_etims_status", "Sent", notify=False)
+	doc.db_set("royce_etims_invoice_number", invc_no, notify=False)
+	doc.db_set("royce_etims_error", "", notify=False)
+	doc.db_set("royce_etims_receipt_signature", receipt_signature, notify=False)
+	doc.db_set("royce_etims_current_receipt_number", info.get("curRcptNo"), notify=False)
+	doc.db_set("royce_etims_total_receipt_number", info.get("totRcptNo"), notify=False)
+	doc.db_set("royce_etims_internal_data", info.get("intrlData"), notify=False)
+	doc.db_set("royce_etims_control_unit_datetime", info.get("sdcDateTime"), notify=False)
 
 	if not receipt_signature:
 		# Success per resultCd, but no signature to build a QR from - log and
@@ -182,8 +182,8 @@ def _apply_success(doc, invc_no, data, settings, branch):
 		return
 
 	verification_url = build_verification_url(qr_verify_base_url, settings.tin, branch.bhf_id, receipt_signature)
-	doc.db_set("etims_qr_verification_url", verification_url, notify=False)
-	doc.db_set("etims_qr_code", generate_qr_data_uri(verification_url), notify=False)
+	doc.db_set("royce_etims_qr_verification_url", verification_url, notify=False)
+	doc.db_set("royce_etims_qr_code", generate_qr_data_uri(verification_url), notify=False)
 
 
 def retry_failed_receipts():
@@ -194,8 +194,8 @@ def retry_failed_receipts():
 		names = frappe.get_all(
 			doctype,
 			filters={
-				"etims_status": ["in", ("Pending", "Failed")],
-				"etims_retry_count": ["<", MAX_RETRY_COUNT],
+				"royce_etims_status": ["in", ("Pending", "Failed")],
+				"royce_etims_retry_count": ["<", MAX_RETRY_COUNT],
 				"docstatus": 1,
 			},
 			pluck="name",
@@ -277,7 +277,7 @@ def build_receipt_payload(doc, invc_no, settings):
 
 	for idx, d in enumerate(doc.items, start=1):
 		item = frappe.get_cached_doc("Item", d.item_code)
-		if item.prevent_etims_submission:
+		if item.royce_prevent_etims_submission:
 			frappe.throw(
 				_("Item {0} has 'Prevent eTIMS Submission' checked - remove it from this document.").format(
 					d.item_code
@@ -292,7 +292,7 @@ def build_receipt_payload(doc, invc_no, settings):
 				)
 			)
 
-		code = item.etims_taxation_type_code or "A"
+		code = item.royce_etims_taxation_type_code or "A"
 		rate = rates.get(code, 0)
 
 		# KRA's OSCU expects tax-INCLUSIVE amounts - CONFIRMED 2026-09-23 by a
@@ -323,12 +323,12 @@ def build_receipt_payload(doc, invc_no, settings):
 			{
 				"itemSeq": idx,
 				"itemCd": item_cd,
-				"itemClsCd": item.etims_item_classification_code,
+				"itemClsCd": item.royce_etims_item_classification_code,
 				"itemNm": item.item_name,
 				"bcd": "",
-				"pkgUnitCd": item.etims_packaging_unit_code,
+				"pkgUnitCd": item.royce_etims_packaging_unit_code,
 				"pkg": 1,
-				"qtyUnitCd": item.etims_quantity_unit_code,
+				"qtyUnitCd": item.royce_etims_quantity_unit_code,
 				"qty": d.qty,
 				"prc": d.base_rate,
 				"splyAmt": d.base_amount,

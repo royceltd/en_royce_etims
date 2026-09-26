@@ -21,7 +21,7 @@ import frappe
 # no longer best-effort guesses for those four. D never appeared in that
 # confirmed response at all - still unconfirmed whether it's even a real KRA
 # taxation type code, not just an unconfirmed rate; kept at 0 as a placeholder
-# rather than removed, since Item's etims_taxation_type Link still needs
+# rather than removed, since Item's royce_etims_taxation_type Link still needs
 # somewhere to point if "D" shows up on an existing item.
 TAXATION_TYPES = [
 	{"code": "A", "description": "Exempt", "rate": 0},

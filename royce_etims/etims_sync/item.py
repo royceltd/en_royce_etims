@@ -20,29 +20,29 @@ from royce_etims.utils.api_client import get_settings, request as etims_request
 from royce_etims.utils.id_mapping import get_etims_id, set_etims_id
 
 REQUIRED_ETIMS_ITEM_FIELDS = (
-	"etims_item_classification",
-	"etims_item_type",
-	"etims_taxation_type",
+	"royce_etims_item_classification",
+	"royce_etims_item_type",
+	"royce_etims_taxation_type",
 	# CONFIRMED required 2026-09-11 by a real saveItem rejection against KRA's
 	# sandbox: {"customerMessage": "orgnNatCd cannot be null"}. Previously
 	# left out on the (wrong) assumption it was optional, since the Postman
 	# sample's comment on this field had no "REQ" marker the way other
 	# required fields did.
-	"etims_origin_nation",
+	"royce_etims_origin_nation",
 )
 
 
 def build_item_payload(item, item_cd):
 	return {
 		"itemCd": item_cd,
-		"itemClsCd": item.etims_item_classification_code,
-		"itemTyCd": item.etims_item_type_code,
+		"itemClsCd": item.royce_etims_item_classification_code,
+		"itemTyCd": item.royce_etims_item_type_code,
 		"itemNm": item.item_name,
 		"itemStdNm": None,
-		"orgnNatCd": item.etims_origin_nation_code,
-		"pkgUnitCd": item.etims_packaging_unit_code,
-		"qtyUnitCd": item.etims_quantity_unit_code,
-		"taxTyCd": item.etims_taxation_type_code,
+		"orgnNatCd": item.royce_etims_origin_nation_code,
+		"pkgUnitCd": item.royce_etims_packaging_unit_code,
+		"qtyUnitCd": item.royce_etims_quantity_unit_code,
+		"taxTyCd": item.royce_etims_taxation_type_code,
 		"btchNo": None,
 		"bcd": None,
 		"dftPrc": item.standard_rate or 0,
@@ -63,7 +63,7 @@ def build_item_payload(item, item_cd):
 
 
 def _validate_ready_to_sync(item, company):
-	if item.prevent_etims_submission:
+	if item.royce_prevent_etims_submission:
 		frappe.throw(_("Item {0} has 'Prevent eTIMS Submission' checked.").format(item.name))
 
 	missing = [f for f in REQUIRED_ETIMS_ITEM_FIELDS if not item.get(f)]
@@ -110,13 +110,13 @@ def sync_item(item_code, company):
 			reference_name=item.name,
 		)
 	except Exception as e:
-		item.db_set("etims_sync_status", "Failed", notify=False)
-		item.db_set("etims_sync_error", str(e)[:140], notify=False)
+		item.db_set("royce_etims_sync_status", "Failed", notify=False)
+		item.db_set("royce_etims_sync_error", str(e)[:140], notify=False)
 		raise
 
-	item.db_set("etims_sync_status", "Synced", notify=False)
-	item.db_set("etims_last_synced_on", now_datetime(), notify=False)
-	item.db_set("etims_sync_error", "", notify=False)
+	item.db_set("royce_etims_sync_status", "Synced", notify=False)
+	item.db_set("royce_etims_last_synced_on", now_datetime(), notify=False)
+	item.db_set("royce_etims_sync_error", "", notify=False)
 
 	return {"success": True, "message": _("Item {0} synced to eTIMS.").format(item.item_code)}
 

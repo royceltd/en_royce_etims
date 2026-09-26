@@ -1,5 +1,5 @@
 app_name = "royce_etims"
-app_title = "Royce Etims"
+app_title = "KRA eTIMS"
 app_publisher = "Royce Technologies LTD"
 app_description = "Generate etims compliant invoices"
 app_email = "developer@roycetechnologies.co.ke"
@@ -23,7 +23,7 @@ add_to_apps_screen = [
 	{
 		"name": "royce_etims",
 		"logo": "/assets/royce_etims/logo.svg",
-		"title": "Royce Etims",
+		"title": "KRA eTIMS",
 		"route": "/app/etims-settings",
 		"has_permission": "royce_etims.check_app_permission",
 	}

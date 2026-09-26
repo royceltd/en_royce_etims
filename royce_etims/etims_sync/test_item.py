@@ -26,12 +26,12 @@ def _complete_item(**overrides):
 		name="TEST-ITEM-001",
 		item_code="TEST-ITEM-001",
 		item_name="Test Item",
-		prevent_etims_submission=0,
-		etims_item_classification="1010151700",
-		etims_item_type="2",
-		etims_taxation_type="B",
-		etims_origin_nation="KE",
-		etims_id_mapping=[],
+		royce_prevent_etims_submission=0,
+		royce_etims_item_classification="1010151700",
+		royce_etims_item_type="2",
+		royce_etims_taxation_type="B",
+		royce_etims_origin_nation="KE",
+		royce_etims_id_mapping=[],
 	)
 	item.update(overrides)
 	return item
@@ -41,15 +41,15 @@ class IntegrationTestItemSync(IntegrationTestCase):
 	def test_origin_nation_is_required(self):
 		"""CONFIRMED 2026-09-11 by a real saveItem rejection - previously
 		missing from REQUIRED_ETIMS_ITEM_FIELDS entirely."""
-		self.assertIn("etims_origin_nation", REQUIRED_ETIMS_ITEM_FIELDS)
+		self.assertIn("royce_etims_origin_nation", REQUIRED_ETIMS_ITEM_FIELDS)
 
-		item = _complete_item(etims_origin_nation=None)
+		item = _complete_item(royce_etims_origin_nation=None)
 		with self.assertRaises(frappe.ValidationError):
 			_validate_ready_to_sync(item, "Royce Technologies LTD")
 
 	def test_complete_item_passes_validation(self):
 		item = _complete_item(
-			etims_id_mapping=[
+			royce_etims_id_mapping=[
 				frappe._dict(
 					setup_doctype="eTIMS Settings",
 					setup_docname="Royce Technologies LTD",
@@ -64,24 +64,24 @@ class IntegrationTestItemSync(IntegrationTestCase):
 	def test_missing_item_code_mapping_raises(self):
 		"""A complete eTIMS profile still isn't enough without an assigned
 		itemCd for this company - a separate, deliberate manual step."""
-		item = _complete_item(etims_id_mapping=[])
+		item = _complete_item(royce_etims_id_mapping=[])
 		with self.assertRaises(frappe.ValidationError):
 			_validate_ready_to_sync(item, "Royce Technologies LTD")
 
 	def test_prevent_etims_submission_raises_regardless_of_other_fields(self):
-		item = _complete_item(prevent_etims_submission=1)
+		item = _complete_item(royce_prevent_etims_submission=1)
 		with self.assertRaises(frappe.ValidationError):
 			_validate_ready_to_sync(item, "Royce Technologies LTD")
 
 	def test_build_item_payload_maps_confirmed_fields(self):
 		item = frappe._dict(
 			item_name="Test Item",
-			etims_item_classification_code="1010151700",
-			etims_item_type_code="2",
-			etims_origin_nation_code="KE",
-			etims_packaging_unit_code="NT",
-			etims_quantity_unit_code="BA",
-			etims_taxation_type_code="B",
+			royce_etims_item_classification_code="1010151700",
+			royce_etims_item_type_code="2",
+			royce_etims_origin_nation_code="KE",
+			royce_etims_packaging_unit_code="NT",
+			royce_etims_quantity_unit_code="BA",
+			royce_etims_taxation_type_code="B",
 			standard_rate=1000,
 			disabled=0,
 		)
@@ -99,12 +99,12 @@ class IntegrationTestItemSync(IntegrationTestCase):
 	def test_build_item_payload_disabled_item_sends_useyn_n(self):
 		item = frappe._dict(
 			item_name="Test Item",
-			etims_item_classification_code="1010151700",
-			etims_item_type_code="2",
-			etims_origin_nation_code="KE",
-			etims_packaging_unit_code="NT",
-			etims_quantity_unit_code="BA",
-			etims_taxation_type_code="B",
+			royce_etims_item_classification_code="1010151700",
+			royce_etims_item_type_code="2",
+			royce_etims_origin_nation_code="KE",
+			royce_etims_packaging_unit_code="NT",
+			royce_etims_quantity_unit_code="BA",
+			royce_etims_taxation_type_code="B",
 			standard_rate=1000,
 			disabled=1,
 		)
