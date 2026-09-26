@@ -42,6 +42,7 @@ a compliance bug, not a UI bug, so don't treat the seed as authoritative.
 
 import frappe
 from frappe import _
+from frappe.contacts.doctype.address.address import get_address_display
 from frappe.utils import flt, getdate, now_datetime
 
 from royce_etims.utils.api_client import request as etims_request
@@ -112,6 +113,7 @@ def on_submit(doc, method=None):
 def sync_receipt(doctype, name):
 	doc = frappe.get_doc(doctype, name)
 	branch = frappe.get_doc("eTIMS Branch", doc.etims_branch)
+	settings = frappe.get_cached_doc("eTIMS Settings", doc.company)
 
 	if branch.device_status not in ("Registered", "Active"):
 		doc.db_set("etims_status", "Failed", notify=False)
@@ -121,7 +123,7 @@ def sync_receipt(doctype, name):
 	invc_no = _next_invoice_number(branch.name)
 
 	try:
-		payload = build_receipt_payload(doc, invc_no)
+		payload = build_receipt_payload(doc, invc_no, settings)
 		data = etims_request(
 			doc.company,
 			"sendSalesTransaction",
@@ -139,19 +141,25 @@ def sync_receipt(doctype, name):
 		frappe.db.commit()
 		return
 
-	settings = frappe.get_cached_doc("eTIMS Settings", doc.company)
 	_apply_success(doc, invc_no, data, settings, branch)
 
 
 def _apply_success(doc, invc_no, data, settings, branch):
 	"""Store sendSalesTransaction's response and generate the receipt QR code.
-	Field names and the verification-URL formula are from navariltd/kenya-
-	compliance's actual (sandbox-tested) implementation against the *other*
-	endpoint name - not re-confirmed against GavaConnect's docs (that page's
-	Response Body section wasn't readable in the copy fetched 2026-09-05).
-	Best available guess, not a confirmed fact - verify against the first
-	real response this endpoint returns."""
-	info = data.get("data") or {}
+
+	Envelope: unwraps the same "responseBody" wrapper CONFIRMED for real
+	2026-09-10 against /initialize (see eTIMS Branch.register_device()) -
+	resultCd/data sit one level inside responseBody, not at the top, for at
+	least that endpoint. What's NOT yet confirmed for THIS endpoint
+	specifically is whether the business fields (rcptSign, curRcptNo, ...)
+	sit directly under responseBody.data (this guess, and what
+	navariltd/kenya-compliance's shape - the origin of these field names -
+	implies) or nested one level further under an "info" key the way
+	/initialize's device fields turned out to be. Verify against the first
+	real signed receipt and correct this comment either way - don't let it
+	go stale."""
+	body = (data or {}).get("responseBody") or data or {}
+	info = body.get("data") or {}
 	receipt_signature = info.get("rcptSign")
 
 	doc.db_set("etims_status", "Sent", notify=False)
@@ -219,7 +227,46 @@ def _next_invoice_number(branch_name):
 	return next_no
 
 
-def build_receipt_payload(doc, invc_no):
+def _build_receipt_block(doc, settings):
+	"""KRA's nested `receipt` object - drives what actually prints on the
+	fiscal receipt (trade name, address, header/footer messages), separate
+	from the top-level invoice/tax fields. Confirmed real field names from
+	eTIMS-OSCU-Integrator-Automated-Testing-Sandbox.json (the same Postman
+	collection docs/architecture.md's 2026-09-05 correction confirmed is the
+	real, currently-correct API surface) - this whole object was previously
+	missing from the payload entirely, despite this module's own docstring
+	claiming it existed.
+
+	trdeNm/adrs prefer real per-document data (Company name, the invoice's
+	own Company Address) over the eTIMS Settings fallbacks, so a company with
+	multiple addresses/trade names on its invoices isn't flattened to one
+	fixed value.
+	"""
+	trade_name = settings.get("receipt_trade_name") or frappe.db.get_value("Company", doc.company, "company_name")
+
+	address = ""
+	if doc.get("company_address"):
+		address = get_address_display(doc.company_address) or ""
+	elif settings.get("receipt_address"):
+		address = settings.receipt_address
+
+	return {
+		"custTin": doc.tax_id or None,
+		"custMblNo": doc.get("contact_mobile") or None,
+		# Reprint sequence, assumed 1 (original print) - unconfirmed against a
+		# real response, but there's no reprint flow in this app yet for it
+		# to differ. Revisit if/when reprints are ever supported.
+		"rptNo": 1,
+		"rcptPbctDt": now_datetime().strftime("%Y%m%d%H%M%S"),
+		"trdeNm": trade_name or "",
+		"adrs": address,
+		"topMsg": settings.get("receipt_top_message") or "",
+		"btmMsg": settings.get("receipt_bottom_message") or "",
+		"prchrAcptcYn": "N",
+	}
+
+
+def build_receipt_payload(doc, invc_no, settings):
 	validate_kra_pin(doc.tax_id, label=_("Customer TIN"))
 
 	items_payload = []
@@ -247,8 +294,28 @@ def build_receipt_payload(doc, invc_no):
 
 		code = item.etims_taxation_type_code or "A"
 		rate = rates.get(code, 0)
-		taxable_amt = flt(d.base_net_amount)
-		tax_amt = flt(taxable_amt * rate / 100, 2)
+
+		# KRA's OSCU expects tax-INCLUSIVE amounts - CONFIRMED 2026-09-23 by a
+		# real sendSalesTransaction rejection: a line sent as prc/totAmt 1000,
+		# taxblAmt 1000 (tax added on top: taxAmt 160) came back
+		# "Invalid taxblAmt on item: 1. Expected: 862.07, But Found: 1000.00"
+		# - 862.07 x 1.16 = 1000.00, i.e. the tax portion must be backed OUT
+		# of the line total, not added on top. Matches standard Kenyan retail
+		# VAT-inclusive pricing. gross_amt (the amount actually charged -
+		# same value used for prc/splyAmt/totAmt below) is now the basis;
+		# taxblAmt/taxAmt are derived from it, not the other way around.
+		#
+		# Still open: whether this ERPNext site's own Kenya VAT tax template
+		# is itself configured tax-inclusive (in which case d.base_amount
+		# already IS this gross, VAT-inclusive figure, and this fix is
+		# complete) or tax-exclusive (in which case d.base_amount is a
+		# pre-tax subtotal, and reconciling against ERPNext's own Sales Taxes
+		# and Charges table - deliberately NOT done here, see this module's
+		# top docstring - would be needed before this is correct for a real
+		# invoice). Confirm before relying on this for a real client invoice.
+		gross_amt = flt(d.base_amount)
+		taxable_amt = flt(gross_amt / (1 + rate / 100), 2) if rate else gross_amt
+		tax_amt = flt(gross_amt - taxable_amt, 2)
 		taxbl[code] += taxable_amt
 		tax[code] += tax_amt
 
@@ -267,10 +334,18 @@ def build_receipt_payload(doc, invc_no):
 				"splyAmt": d.base_amount,
 				"dcRt": d.discount_percentage or 0,
 				"dcAmt": d.discount_amount or 0,
+				# Compulsory-insurance fields (motor vehicles etc.) - null in
+				# the confirmed sample payload too. Item has no insurance data
+				# to source these from yet; sent explicitly rather than
+				# omitted in case KRA's validator expects the keys present.
+				"isrccCd": None,
+				"isrccNm": None,
+				"isrcRt": None,
+				"isrcAmt": None,
 				"taxblAmt": taxable_amt,
 				"taxTyCd": code,
 				"taxAmt": tax_amt,
-				"totAmt": d.base_amount,
+				"totAmt": gross_amt,
 				"itemExprDt": None,
 			}
 		)
@@ -278,7 +353,6 @@ def build_receipt_payload(doc, invc_no):
 	payload = {
 		"invcNo": invc_no,
 		"orgInvcNo": 0,  # credit-note/orig-invoice linkage not handled yet - see docs/architecture.md open items
-		"trdInvcNo": doc.name,
 		"custTin": doc.tax_id or None,
 		"custNm": doc.customer_name,
 		"salesTyCd": "N",
@@ -306,5 +380,6 @@ def build_receipt_payload(doc, invc_no):
 		"modrId": doc.modified_by,
 		"modrNm": doc.modified_by,
 		"itemList": items_payload,
+		"receipt": _build_receipt_block(doc, settings),
 	}
 	return payload

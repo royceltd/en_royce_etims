@@ -16,14 +16,19 @@ item in docs/architecture.md) than assert something unverified.
 
 import frappe
 
-# TODO: confirm rates against KRA's selectCodeList before go-live - same
-# caveat as the TAX_RATE_BY_CODE dict this replaces in etims_sync/receipt.py.
+# A/B/C/E rates CONFIRMED 2026-09-10 against a real selectCodeList response
+# (see docs/architecture.md's "RESOLVED, 2026-09-10, final update" section) -
+# no longer best-effort guesses for those four. D never appeared in that
+# confirmed response at all - still unconfirmed whether it's even a real KRA
+# taxation type code, not just an unconfirmed rate; kept at 0 as a placeholder
+# rather than removed, since Item's etims_taxation_type Link still needs
+# somewhere to point if "D" shows up on an existing item.
 TAXATION_TYPES = [
-	{"code": "A", "description": "Exempt (best-effort, confirm via selectCodeList)", "rate": 0},
-	{"code": "B", "description": "Standard Rate (best-effort, confirm via selectCodeList)", "rate": 16},
-	{"code": "C", "description": "Zero Rated (best-effort, confirm via selectCodeList)", "rate": 0},
-	{"code": "D", "description": "Non-VAT (best-effort, confirm via selectCodeList)", "rate": 0},
-	{"code": "E", "description": "(best-effort, confirm via selectCodeList)", "rate": 0},
+	{"code": "A", "description": "Exempt", "rate": 0},
+	{"code": "B", "description": "VAT 16%", "rate": 16},
+	{"code": "C", "description": "Zero Rated", "rate": 0},
+	{"code": "D", "description": "Non-VAT (never appeared in the confirmed selectCodeList response - code's existence itself is unconfirmed)", "rate": 0},
+	{"code": "E", "description": "VAT 8%", "rate": 8},
 ]
 
 ITEM_TYPES = [

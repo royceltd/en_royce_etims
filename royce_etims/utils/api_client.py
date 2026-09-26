@@ -182,6 +182,16 @@ def request(
 	if access_token:
 		headers["Authorization"] = f"Bearer {access_token}"
 
+	# CONFIRMED required 2026-09-11 for saveItem (real KRA rejection:
+	# "apigee_app_id cannot be Null") - unlike tin/bhfId/cmcKey, this isn't
+	# something a branch/company config always has, so send it only when set
+	# rather than blocking every call on a field most companies won't have
+	# populated yet. See eTIMS Settings.gavaconnect_app_id's description and
+	# docs/architecture.md for what's still unconfirmed about where this
+	# value actually comes from.
+	if settings.get("gavaconnect_app_id"):
+		headers["apigee_app_id"] = settings.gavaconnect_app_id
+
 	branch_doc = None
 	if branch:
 		branch_doc = get_branch(branch)
@@ -215,21 +225,42 @@ def request(
 	except ValueError:
 		data = {}
 
-	if not response.ok:
-		frappe.throw(_("eTIMS call to {0} failed ({1}): {2}").format(endpoint, response.status_code, data or response.text))
+	return _parse_response(data, response, endpoint)
 
-	# resultCd "000" = success. The real business payload is wrapped in
-	# "responseBody" (confirmed 2026-09-10 from a genuine successful call) -
-	# falls back to checking the top level directly if that key is absent,
-	# since this isn't yet confirmed as universal across every endpoint.
+
+def _parse_response(data, response, endpoint):
+	"""Decide success/failure and return the parsed body, or raise.
+
+	HTTP status alone is NOT a reliable success/failure signal - CONFIRMED
+	2026-09-10 by a real response: KRA's gateway returned HTTP 400 for a
+	well-formed, fully-authenticated selectCodeList call whose own body said
+	resultCd "001" ("There is no search result", i.e. a normal empty-result
+	business response), with responseHeader.responseCode: 200 *inside* that
+	same "failed" HTTP response. So resultCd, when present, is the real
+	signal - HTTP status is only the fallback for responses that aren't a
+	recognizable KRA business envelope at all (e.g. the flatter
+	"header"/"body" shape a raw gateway error like a 504 Timeout uses instead
+	of "responseHeader"/"responseBody" - confirmed 2026-09-23 - has no
+	resultCd to find, so correctly falls through to the HTTP-status check
+	below).
+
+	The real business payload is wrapped in "responseBody" (confirmed
+	2026-09-10) - falls back to checking the top level directly if that key
+	is absent, since this isn't yet confirmed as universal across every
+	endpoint.
+	"""
 	body = data.get("responseBody", data) if isinstance(data, dict) else {}
 	result_cd = body.get("resultCd") if isinstance(body, dict) else None
-	if result_cd is not None and result_cd != "000":
-		frappe.throw(
-			_("eTIMS rejected the request to {0}: {1}").format(
-				endpoint, body.get("resultMsg") or data
+
+	if result_cd is not None:
+		if result_cd != "000":
+			frappe.throw(
+				_("eTIMS rejected the request to {0}: {1}").format(
+					endpoint, body.get("resultMsg") or data
+				)
 			)
-		)
+	elif not response.ok:
+		frappe.throw(_("eTIMS call to {0} failed ({1}): {2}").format(endpoint, response.status_code, data or response.text))
 
 	return data
 

@@ -16,9 +16,16 @@
   "gavaconnect_consumer_key",
   "column_break_gavaconnect",
   "gavaconnect_consumer_secret",
+  "gavaconnect_app_id",
   "sign_section",
   "sign_pos_invoices",
-  "sign_sales_invoices"
+  "sign_sales_invoices",
+  "receipt_section",
+  "receipt_trade_name",
+  "receipt_address",
+  "column_break_receipt",
+  "receipt_top_message",
+  "receipt_bottom_message"
  ],
  "fields": [
   {
@@ -83,6 +90,12 @@
    "label": "Consumer Secret"
   },
   {
+   "description": "CONFIRMED required 2026-09-11 by a real saveItem rejection: \"Invalid Headers apigee_app_id\" / \"apigee_app_id cannot be Null\". CONFIRMED NOT the same as Consumer Key - tried twice for real (not a fluke), both times got the identical internal error \"...TestSessionApiLog.getApiNo()... TestSessionApplicationStepDto...is null\" instead of a clean accept/reject, meaning KRA's backend treated the Consumer Key as a lookup key into its own Automated App Testing session tracking and found nothing. Get the real value from the GavaConnect developer portal's My Apps page (or ask KRA support specifically about Automated App Testing) before relying on saveItem/sendSalesTransaction - see docs/architecture.md. Don't re-try the Consumer Key here again.",
+   "fieldname": "gavaconnect_app_id",
+   "fieldtype": "Data",
+   "label": "Apigee App ID"
+  },
+  {
    "fieldname": "sign_section",
    "fieldtype": "Section Break",
    "label": "What to Sign"
@@ -100,6 +113,40 @@
    "fieldname": "sign_sales_invoices",
    "fieldtype": "Check",
    "label": "Sign Sales Invoices (credit/general)"
+  },
+  {
+   "fieldname": "receipt_section",
+   "fieldtype": "Section Break",
+   "label": "Receipt Branding",
+   "description": "Feeds the nested \"receipt\" object KRA's sendSalesTransaction expects (confirmed real shape: eTIMS-OSCU-Integrator-Automated-Testing-Sandbox.json) - what actually prints on the fiscal receipt, separate from the invoice's own line items."
+  },
+  {
+   "description": "Shown as the receipt's trade name (trdeNm). Falls back to the Company's name if left blank.",
+   "fieldname": "receipt_trade_name",
+   "fieldtype": "Data",
+   "label": "Trade Name"
+  },
+  {
+   "description": "Shown as the receipt's address (adrs) when the invoice itself has no Company Address set. Leave blank to send an empty address in that case rather than guess one.",
+   "fieldname": "receipt_address",
+   "fieldtype": "Small Text",
+   "label": "Fallback Address"
+  },
+  {
+   "fieldname": "column_break_receipt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Printed above the itemized list on KRA-signed receipts (topMsg), e.g. a welcome message.",
+   "fieldname": "receipt_top_message",
+   "fieldtype": "Data",
+   "label": "Receipt Header Message"
+  },
+  {
+   "description": "Printed at the bottom of KRA-signed receipts (btmMsg), e.g. a thank-you or return-policy note.",
+   "fieldname": "receipt_bottom_message",
+   "fieldtype": "Data",
+   "label": "Receipt Footer Message"
   }
  ],
  "grid_page_length": 50,

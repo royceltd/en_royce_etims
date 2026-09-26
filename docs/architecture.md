@@ -260,6 +260,220 @@ auth stack is now confirmed working end to end (see above). Next real step is bu
 actual business endpoints (`sendSalesTransaction` first) against this now-proven transport layer,
 and reconciling `eTIMS Taxation Type`'s seed data against the real code list confirmed above.
 
+**2026-09-11: `sendSalesTransaction`'s payload had a real gap, found by cross-checking the original
+`eTIMS-OSCU-Integrator-Automated-Testing-Sandbox.json` Postman collection against what `receipt.py`
+actually builds** - the same collection the 2026-09-05 correction already confirmed is the real,
+currently-correct API surface (same host, same endpoint names), just not previously diffed
+field-by-field against this app's payload builder. Three fixes:
+
+1. **The nested `receipt` sub-object was entirely missing.** `receipt.py`'s own module docstring
+   claimed *"the payload itself carries a nested `receipt` sub-object"*, but `build_receipt_payload()`
+   never built one - grepping the codebase found zero references. Added `_build_receipt_block()`:
+   `custTin`/`custMblNo` from the document (`tax_id`/`contact_mobile`), `rptNo` fixed at `1` (no
+   reprint flow exists to make it anything else), `rcptPbctDt` as the current KRA-format timestamp,
+   `trdeNm`/`adrs` sourced from the document's own data (Company name, Company Address) with new
+   `eTIMS Settings.receipt_trade_name`/`receipt_address` fallbacks for when those aren't set,
+   `topMsg`/`btmMsg` from new `eTIMS Settings.receipt_top_message`/`receipt_bottom_message` fields
+   (a real per-company choice, not something to hardcode), `prchrAcptcYn` mirroring the top-level
+   value. **`rptNo`'s exact meaning (reprint count vs. something else) is assumed, not confirmed** -
+   revisit if a real response or KRA feedback says otherwise.
+2. **`trdInvcNo` was sent but isn't a real field** - it appears nowhere in the confirmed collection's
+   request body. Dropped rather than kept as an unexplained guess.
+3. **`_apply_success()`'s response parsing used the wrong envelope level.** It read `data.get("data")`
+   directly; the one shape actually confirmed for real (`/initialize`, see `eTIMS
+   Branch.register_device()`) nests business fields inside `responseBody.data...`. Changed to unwrap
+   `responseBody` the same way, with a fallback to the flat shape if that key is absent. **Whether
+   `sendSalesTransaction`'s fields sit at `responseBody.data` (this guess) or one level deeper under
+   an `info` key the way `/initialize`'s device fields turned out to be is still NOT confirmed** -
+   verify against the first real signed receipt.
+
+Also added, for completeness against the confirmed sample payload: each item row now sends
+`isrccCd`/`isrccNm`/`isrcRt`/`isrcAmt` as explicit nulls (compulsory-insurance fields Item has no
+data source for yet) rather than omitting the keys, in case KRA's validator expects them present.
+
+**Also decided this session: Royce Technologies will pursue Certified Third-Party Integrator status**
+(not self-integrator per client) - resolves the "strategic fork" flagged 2026-09-05 in the Open items
+section below. Confirms the CTO recommendation already on record. Practical implication: steps 3-8 of
+the onboarding checklist below (App creation, testing, KYC, verification demo, SLA) are done once for
+RoyceERP itself; future clients only repeat the lighter taxpayer-side steps (1-2). This is a business/
+compliance workstream, not an engineering task - no code change follows from it directly, but it does
+mean the "one Company, one PIN, one eTIMS Settings" data model already built doesn't need to change to
+support it (each client Company still gets its own `eTIMS Settings`/TIN regardless of integrator
+status - what changes is who KRA holds accountable for the software, not the data model).
+
+Test coverage added for this fix: `royce_etims/etims_sync/test_receipt.py` - pure-logic tests for
+`_build_receipt_block()`'s fallback ordering and `_apply_success()`'s envelope unwrapping, using
+lightweight stand-ins rather than full Sales Invoice submissions (deliberately sidesteps a pre-existing,
+unrelated `Price List: Standard Buying` DuplicateEntryError this bench's shared dev site hits on any
+test that inserts a Company-linked document - reproduces on `test_etims_branch.py` unmodified too).
+
+**2026-09-11, later same day: attempted the first real `saveItem` call as a precursor to a real
+`sendSalesTransaction` test - found two more genuine gaps, and one still-open blocker.**
+
+First, `eTIMS Taxation Type`/`eTIMS Item Type` turned out to have **zero rows** on this bench despite
+`seed_etims_reference_data.py` having a `Patch Log` entry from 2026-09-05 saying it already ran - the
+seeded rows were deleted at some point after that (unrelated to this session; not investigated
+further). Re-ran the patch after correcting its data to match the real confirmed `selectCodeList`
+result from the same day (`B: 16 -> unchanged`, `E: 0 -> 8`) - it had never been updated with that
+finding. `eTIMS Item Classification`/`Packaging Unit`/`Quantity Unit`/`Country of Origin` were (still
+are, by original design) completely unseeded - no Item on this bench had ever had a full eTIMS
+profile. With the user's explicit sign-off (not a unilateral call - this is exactly the kind of
+"seeding guesses would look like real reference data" situation this doc has warned about
+before), seeded one sample-only row each from literal values already present in the confirmed
+Postman collection's own `saveItem`/purchase-transaction examples (`itemClsCd 1010151700`,
+`pkgUnitCd NT`, `qtyUnitCd BA`) via a new patch, `seed_sample_item_reference_data.py` - loudly labeled
+in both the patch's docstring and every seeded row's `description` as a stopgap, not a real code list.
+
+Built one real test Item (`ETIMS-INTEGRATION-TEST-001`) using those codes, assigned it an itemCd
+(`KE2NTBA00090001`) following a structural pattern inferred from multiple confirmed samples in the
+same collection (`originNationCode(2) + itemTyCd(1) + pkgUnitCd(2) + qtyUnitCd(2) + sequence(8)` -
+e.g. `KE2NTBA00000001`, `AO2NTBA00000005`, `BI3NTBA00000004` all fit this shape) - inferred, not
+independently confirmed by KRA docs, but consistent across every sample checked. Called
+`etims_sync.item.sync_item()` for real against KRA's sandbox. Two real rejections, both genuinely
+informative:
+
+1. **`orgnNatCd cannot be null`** - Country of Origin, which this app had treated as optional
+   (`REQUIRED_ETIMS_ITEM_FIELDS` didn't include it), is actually mandatory. **Fixed**:
+   `etims_sync/item.py` now requires `etims_origin_nation` too. Seeded `KE` (Kenya) as the one
+   `eTIMS Country of Origin` row needed to unblock this - same sample-only caveat as above.
+2. **`Invalid Headers apigee_app_id` / `apigee_app_id cannot be Null`** - confirms a header this app
+   never sends at all is actually required for `saveItem` (previously assumed *not* required, since
+   `/initialize`/`selectCodeList`/`selectBhfList` all succeeded for real without it - that assumption
+   was wrong, at least for this endpoint). **Added the plumbing** (`eTIMS Settings.gavaconnect_app_id`,
+   sent as the `apigee_app_id` header in `api_client.py` when configured) but **the correct value is
+   still unknown** - a diagnostic probe using the already-stored GavaConnect Consumer Key as a
+   stand-in got back a *different*, internal-looking error (`Cannot invoke
+   "...TestSessionApiLog.getApiNo()"... TestSessionApplicationStepDto.getTestSessionApiLog() is
+   null`), which strongly suggests this value is tied to KRA's **Automated App Testing** session
+   (onboarding checklist step 5 above), not simply an Apigee app credential Royce already has. Get
+   the real value (or confirm an Automated App Testing session needs to be started first) from the
+   GavaConnect developer portal's "My Apps" page before trying again - don't keep guessing at this
+   one the way the token-endpoint shape was over-debugged earlier.
+
+**Confirmed same day, at the user's request: Consumer Key as `apigee_app_id` retried for real through
+the actual code path (not just the earlier raw diagnostic call) - identical result, byte-for-byte,
+both times.** Not a fluke or a transient KRA-side issue. This rules out "maybe it just needed the
+real header-injection code path" as an explanation and strengthens the Automated App Testing session
+theory: KRA's backend appears to use whatever's sent as `apigee_app_id` as a lookup key into its own
+test-session tracking (`TestSessionApiLog`/`TestSessionApplicationStepDto`), and a value that isn't a
+real session identifier - Consumer Key or otherwise - NPEs there rather than cleanly rejecting.
+`eTIMS Settings.gavaconnect_app_id` reverted to blank (a known-wrong value left configured is no
+better than blank, and risks being mistaken for a working one later). **Do not retry the Consumer Key
+for this field again** - next step has to be the GavaConnect portal's My Apps page or KRA support,
+not another guess from this codebase's side.
+
+**RESOLVED, 2026-09-23: the real Apigee App ID was found on the GavaConnect portal's own "Validation"
+screen** (the Automated App Testing tool's test-case dashboard, confirming the Automated-App-Testing
+theory above) - `36547f88-97fb-4e70-8aa9-5b1e1bfdf4ea`, a UUID exactly matching the Apigee "App ID is
+distinct from Consumer Key/Secret" pattern predicted from Apigee's own public docs. That same screen
+also surfaces two different PINs worth distinguishing: **`Integrator Pin` (`P051909825V`) matches
+`eTIMS Settings.tin` exactly** - confirms the TIN configured here has been correct all along - while
+**`Application Test Pin` (`P600004665A`) is a separate, KRA-side test taxpayer PIN**, presumably scoped
+to KRA's own Automated App Testing certification suite specifically, not our normal sandbox device
+registration. Left `tin` on the real Integrator Pin; hasn't been tried with the Application Test Pin -
+worth trying if a future call needs to go through KRA's own formal test-case flow rather than ad hoc
+testing against our already-registered device.
+
+With the real App ID set, `saveItem` was retried for real (twice) - **the error type changed
+completely**, which is itself confirmation the App ID was the actual fix: from an application-layer
+NPE (`TestSessionApiLog`) to a clean gateway-level `504 Gateway Timeout` (KRA's flatter
+`header`/`body` envelope, not `responseHeader`/`responseBody`) - meaning the request now passes
+whatever check was failing before and reaches a backend service that isn't responding in time. Two
+consecutive 504s seconds apart suggests KRA's sandbox `saveItem` backend was under load or down at
+that moment, not something wrong on our side - retry later rather than hammer it. **Next step:
+retry `saveItem`, then `sendSalesTransaction`, once KRA's sandbox is responsive again.**
+
+**Update, same day ~12 minutes later: retried, still 504 - and confirmed it's sandbox-wide, not
+`saveItem`-specific.** A call to `selectBhfList` (an endpoint with no relationship to `apigee_app_id`,
+confirmed genuinely working as recently as 2026-09-10) also returned the identical 504 Gateway Timeout
+envelope. This rules out anything about our payload, headers, or the App ID being the cause - KRA's
+entire sandbox gateway is unresponsive right now. Nothing left to debug from this side; just wait and
+retry later. Don't keep polling it repeatedly - space retries out.
+
+**RECOVERED and major real progress, same day ~12 minutes later.** `selectBhfList` came back clean
+(`resultCd "000"`) confirming the sandbox was back. Retrying `saveItem` surfaced a genuinely new,
+real constraint, then several more in sequence - each one KRA's own error message told us exactly how
+to fix, not guessed:
+
+1. **`Invalid itemCd Sequence. Expected sequence ending with: ********2`** - itemCd's numeric
+   sequence is NOT freely chosen by the taxpayer; KRA tracks an expected-next value server-side per
+   taxpayer/device and rejects anything else, "reused or not incremented properly." Two wrong guesses
+   (`...00090001`, `...00090002` - both assumed the hint meant "any value ending in the digit 2",
+   which the identical rejection text for two different values disproved) before landing on the
+   correct reading: the hint means the literal sequence integer, i.e. exactly `2` (as in `KE2NTBA
+   00000002`) - meaning something (almost certainly the earlier standalone-script testing recorded
+   elsewhere in this doc) already consumed sequence `1` on this device. **`saveItem` succeeded for
+   real** with `KE2NTBA00000002` - `ETIMS-INTEGRATION-TEST-001.etims_sync_status` is now genuinely
+   `Synced`. (One process note: the first successful call's local bookkeeping - sync_status, the
+   eTIMS Log row - was lost because the console script that ran it never called
+   `frappe.db.commit()`. The KRA-side registration was real and permanent regardless; only our own
+   local record of it was briefly out of sync, fixed by re-applying the same `db_set`s with an
+   explicit commit. Worth remembering for any future ad hoc live testing via `bench console`.)
+
+2. **`Invalid taxblAmt on item: 1. Expected: 862.07, But Found: 1000.00`** - CONFIRMED KRA's OSCU
+   expects tax-INCLUSIVE amounts: `862.07 x 1.16 = 1000.00`, i.e. the tax portion must be backed OUT
+   of the line total, not added on top the way `etims_sync/receipt.py` was computing it. **Fixed** -
+   see the code comment in `build_receipt_payload()` for the corrected formula. Matches standard
+   Kenyan retail VAT-inclusive pricing. **Still genuinely open**: whether this ERPNext site's real
+   Kenya VAT tax template (`kenyan_accountant`) is itself configured tax-inclusive (this fix is then
+   complete) or tax-exclusive (in which case `d.base_amount` is a pre-tax subtotal and this needs
+   reconciling against the invoice's own Sales Taxes and Charges table before it's correct for a real
+   client invoice, not just this synthetic test) - not checked this session, worth confirming before
+   turning on real signing for any company.
+
+3. **`Invalid Item: Item KE2NTBA00000002 (itemSeq 1) does not exist in your stock master`** -
+   confirms a real, previously unknown prerequisite chain: an item must be registered via
+   `save/stockMaster` (and apparently `insert/stockIO`, a real stock-in movement) before
+   `sendSalesTransaction` will accept it, even though `saveItem` alone had already succeeded.
+   `etims_sync/` has no stock-sync module at all yet - this app has never built anything against the
+   Postman collection's "Stock Information Management" endpoints (`save/stockMaster`,
+   `insert/stockIO`, `selectStockMoveLists`).
+   - `save/stockMaster` with `rsdQty: 100` was rejected: `"rsdQty mismatch. Expected: 0.0 but found:
+     100"` - **worth noting separately**: this specific rejection came back as **HTTP 200** with
+     `responseHeader.responseCode: 400` and `responseBody: null` - a THIRD distinct envelope shape,
+     none of the two already handled by `api_client._parse_response()` (no `resultCd` anywhere to
+     find, and `response.ok` was true, so it was treated as a success and returned silently). **Real
+     bug, not yet fixed** - add to the open items list below.
+   - Retried with `rsdQty: 0` (per the error's own guidance) - succeeded for real (`resultCd "000"`).
+   - `insert/stockIO` needed two more corrections, both straightforward: `ocrnDt` must not be a
+     future date relative to KRA's own server clock (our bench's `today()` was briefly ahead of
+     KRA's clock - a timezone/rollover quirk, not a real validation rule), and `sarNo` is
+     server-tracked the same way itemCd's sequence is - KRA's error named the expected value (`4`)
+     directly. Succeeded for real once both were corrected.
+   - **`sendSalesTransaction` retried after both succeeded - identical "does not exist in your stock
+     master" rejection, unchanged.** Initial theory: propagation delay between KRA's
+     stock-registration services and its sales-validation service (consistent with the sandbox-wide
+     504 outage seen earlier the same session). **Retried again ~10-15 minutes later (after writing
+     and running the full test suite in between) - still the identical rejection**, which weakens
+     (doesn't rule out, but weakens) the "just needed a few more minutes" theory - either the real
+     propagation delay is much longer than that, or something else is still missing. Two real
+     candidates, neither guessed at live this session on purpose (to avoid repeating the
+     `apigee_app_id`-style trial-and-error on a dimension we don't actually understand yet):
+     - `insert/stockIO`'s `sarTyCd: "03"` was copied directly from the one confirmed Postman sample,
+       but that sample's own comment flags it as `// REFERENCE 4.15` - i.e. KRA has a real reference
+       code list for stock-adjustment types this app has never fetched. If `"03"` doesn't actually
+       mean "opening stock" / "stock in" specifically, the call could have succeeded validation-wise
+       without KRA's stock ledger treating it as available-for-sale stock.
+     - Simple longer propagation delay - government sandbox systems sometimes reconcile "live" views
+       from a write-ahead log on a batch cadence (hourly/nightly), not instantly.
+     **Next step, not done this session:** either wait longer (hours, not minutes) and retry once
+     more, or find KRA's real `sarTyCd` reference list (likely via `selectCodeList` under a
+     stock-adjustment-type code class, unconfirmed which one) before guessing at a different value.
+
+**Net effect: real, permanent registrations now exist in KRA's sandbox for the first time** -
+`ETIMS-INTEGRATION-TEST-001` has a real `saveItem` registration (`KE2NTBA00000002`), a real
+`stockMaster` record, and a real `stockIO` stock-in movement (`sarNo 4`, 100 units). The tax-inclusive
+math fix is real and code-level, not just a workaround for this test. `sendSalesTransaction` itself is
+the one call still not confirmed end-to-end - closer than at any point before this session, but not
+done.
+
+**Net effect: a real `sendSalesTransaction` test is still blocked**, now specifically on
+`gavaconnect_app_id` - everything upstream of it (payload shape, taxation rates, one usable test Item
+with a real KRA-format itemCd, origin nation) is ready to go the moment that value is known. As a
+side effect of this session, `eTIMS Settings: Royce Technologies LTD.default_branch` is now set to
+`Royce Technologies LTD-02` (previously blank - needed for `sync_item()`'s branch-scoped auth; harmless
+and arguably overdue regardless of this session's specific test).
+
 **The real onboarding process is much heavier than this doc previously assumed** - see the revised
 step list below. It's not "register device, get cmcKey, start signing" - there's automated app
 testing with uploaded artefacts, a full KYC document set, a scheduled joint verification demo with
@@ -294,9 +508,9 @@ this doc previously had:
    approval letter** (self-integrators - no SLA needed).
 9. **Production keys** issued through the portal, then go-live.
 
-**The strategic fork this implies for "easier client onboarding":** this entire process runs per
-*taxpayer PIN* - registering Royce Technologies LTD's own PIN (in progress) does not automatically
-cover any future client's PIN. Two models, not yet decided between:
+**The strategic fork this implies for "easier client onboarding" - DECIDED 2026-09-11, third-party
+integrator.** This entire process runs per *taxpayer PIN* - registering Royce Technologies LTD's own
+PIN (in progress) does not automatically cover any future client's PIN. Two models were considered:
 
 - **Self-integrator per client** - every future client repeats steps 1-9 under their own PIN,
   choosing RoyceERP as their system. Lighter KYC per client, but a multi-week KRA-approval
@@ -334,6 +548,11 @@ just a config change.
   (`dvcSrlNo`) issued):** not automated for now. The app presents it as a checklist step; client
   either does it themselves or we do it for them as a paid-assist service. Revisit once/if we
   pursue KRA "verified third-party integrator" status.
+- **Integrator status: Certified Third-Party Integrator, decided 2026-09-11.** Not self-integrator
+  per client - see the note under "First live round-trip" above and the (now resolved) strategic-fork
+  discussion below for the reasoning. Doesn't change the data model (each client Company still gets
+  its own `eTIMS Settings`); it's a compliance/business workstream (steps 3-8 of the onboarding
+  checklist, done once for RoyceERP), not an engineering task.
 - **Receipt sync is asynchronous.** Submission in ERPNext is never blocked on KRA's API. Sync
   happens as a background job with a visible status field and automatic retry.
 - **What gets signed: receipts, not invoices — for now.** KRA's OSCU API has one call for this,
@@ -367,23 +586,60 @@ just a config change.
 
 ## Open / not yet decided
 
-- **Self-integrator vs certified third-party integrator** (added 2026-09-05, see the correction
-  above) - the single biggest unresolved question for the "easier client onboarding" goal. Needs a
-  business decision, not a code change; CTO recommendation is third-party integrator, for scale.
+- ~~Self-integrator vs certified third-party integrator~~ - **decided 2026-09-11: Royce Technologies
+  will pursue Certified Third-Party Integrator status** (see the note above). No longer open.
 - ~~Whether the GavaConnect Apigee OAuth layer is required~~ - **confirmed yes, and now working end
   to end**, 2026-09-10 (see the correction above) - real token fetch, real `/initialize` result, real
   `selectCodeList` data all confirmed.
 - `sendSalesTransaction`'s exact response envelope is still NOT confirmed for real (unlike
   `/initialize` and `selectCodeList`, both now verified against genuine responses this session) -
-  still running on kenya-compliance's shape as a best guess in `receipt.py`. Verify against the
-  first real signed receipt rather than assuming it matches `/initialize`'s now-confirmed shape.
-- KRA's gateway returned HTTP 400 for a well-formed, fully-authenticated "no data found" business
-  response (`resultCd "001"`) during this session's testing - `api_client.request()`'s blanket
-  `not response.ok` throw doesn't distinguish that from a real failure. Worth softening once more
-  endpoints are exercised for real and the pattern is better understood.
+  the payload gap (missing `receipt` object) and the envelope-parsing mismatch were fixed 2026-09-11
+  by cross-checking the confirmed Postman collection, but the *response* shape itself is still an
+  educated guess (see that note above) pending a real signed receipt.
+- ~~`apigee_app_id` header - likely not required~~ - **wrong, corrected same day**: a real `saveItem`
+  call rejected with `"apigee_app_id cannot be Null"`. Plumbing added (`eTIMS
+  Settings.gavaconnect_app_id`), but the real value is still unknown - see the 2026-09-11 note above.
+  **This is the single blocker on a real `sendSalesTransaction` test right now.**
+- `eTIMS Settings.receipt_trade_name`/`receipt_address`/`receipt_top_message`/`receipt_bottom_message`
+  (added 2026-09-11) are currently unset for `Royce Technologies LTD` - fine for a sandbox test call,
+  but worth populating with real values before the first production-environment receipt is signed.
+- ~~KRA's gateway returned HTTP 400 for a well-formed, fully-authenticated "no data found" business
+  response... blanket `not response.ok` throw doesn't distinguish that from a real failure~~ -
+  **partially fixed 2026-09-11**: `api_client.request()` (now `_parse_response()`, extracted for
+  testability - see `utils/test_api_client.py`) checks the body's own `resultCd` first and only falls
+  back to raw HTTP status when no `resultCd` is present at all, so the error message is now the real
+  `resultMsg` instead of a blind HTTP-status/body dump. **Still open**: a non-"000" `resultCd` (e.g.
+  "001") still raises - it doesn't read as a hard failure with a wrong message anymore, but it's still
+  treated as an exception, not a soft no-op a caller could distinguish from a real rejection.
+  Deliberately not decided here: whether specific codes like "001" should stop being an exception at
+  all is a per-endpoint business call (does a caller querying for "no data found" want an empty result
+  or an exception?), not something this generic transport function should decide unilaterally.
 - `eTIMS Taxation Type`'s seeded rates should be reconciled against the real `selectCodeList`
   response confirmed this session (`A=Exempt, B=16%, C=Zero Rated, E=8%`) - the "E" code wasn't
   previously known.
+- **`api_client._parse_response()` doesn't handle a THIRD real envelope shape** - CONFIRMED
+  2026-09-23 by a real `save/stockMaster` rejection: HTTP 200, `responseHeader.responseCode: 400`,
+  `responseBody: null`. No `resultCd` anywhere for `_parse_response()` to find, and `response.ok` is
+  true, so it's currently returned as a silent success - the caller never sees the rejection at all.
+  Needs a third check: when `responseBody` is present but `None`/empty, fall back to
+  `responseHeader.responseCode` (not just HTTP status) before deciding success. Real bug, not a
+  hypothetical - found live, not yet fixed.
+- **No stock-sync module exists (`etims_sync/stock.py` or similar)** - CONFIRMED 2026-09-23 that
+  `sendSalesTransaction` rejects an item that only has a `saveItem` registration with "does not exist
+  in your stock master." Needs `save/stockMaster` (register the item, `rsdQty` starts at 0) and
+  `insert/stockIO` (real stock movements - `sarNo` is a server-tracked per-device sequence, the same
+  pattern as `invcNo`/itemCd's sequence) built out properly, not just proven live ad hoc. Blocks
+  turning on real signing for any item-selling company until built.
+- `sendSalesTransaction` still rejected an item with "does not exist in your stock master" even
+  after both `save/stockMaster` and `insert/stockIO` succeeded for it for real (2026-09-23) -
+  most likely a propagation delay between KRA's stock services and its sales-validation service
+  (consistent with the sandbox-wide 504 outage earlier the same session), not a further
+  configuration problem - but not confirmed by a later retry yet. Retry before concluding anything
+  more is wrong.
+- The tax-inclusive-amount fix (`build_receipt_payload`'s `taxblAmt`/`taxAmt` calculation, fixed
+  2026-09-23) needs reconciling against how this bench's real Kenya VAT Sales Taxes and Charges
+  template (`kenyan_accountant`) is actually configured (inclusive vs exclusive) before relying on it
+  for a real client invoice - see the code comment for the full reasoning. Not checked this session.
 - Production base URL for GavaConnect is not confirmed at all - `PRODUCTION_BASE_URL` is
   deliberately left empty in `utils/config.py` rather than guessed.
 - Whether `etims-api-sbx.kra.go.ke` (the abandoned second correction's host) is a dead end, a

@@ -23,6 +23,12 @@ REQUIRED_ETIMS_ITEM_FIELDS = (
 	"etims_item_classification",
 	"etims_item_type",
 	"etims_taxation_type",
+	# CONFIRMED required 2026-09-11 by a real saveItem rejection against KRA's
+	# sandbox: {"customerMessage": "orgnNatCd cannot be null"}. Previously
+	# left out on the (wrong) assumption it was optional, since the Postman
+	# sample's comment on this field had no "REQ" marker the way other
+	# required fields did.
+	"etims_origin_nation",
 )
 
 
