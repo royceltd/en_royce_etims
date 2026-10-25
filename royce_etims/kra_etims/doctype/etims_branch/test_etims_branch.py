@@ -7,7 +7,9 @@ from frappe.tests import IntegrationTestCase
 from royce_etims.setup.utils import TEST_COMPANY
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
-IGNORE_TEST_RECORD_DEPENDENCIES = []
+# Tests use TEST_COMPANY. Walking Company's links reaches Payment Gateway, which lives in
+# Frappe's separate payments app (not installed), and setUpClass fails.
+IGNORE_TEST_RECORD_DEPENDENCIES = ["Company"]
 
 
 class IntegrationTesteTIMSBranch(IntegrationTestCase):

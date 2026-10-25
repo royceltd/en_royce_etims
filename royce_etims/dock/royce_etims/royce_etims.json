@@ -1,0 +1,24 @@
+{
+ "app": "royce_etims",
+ "creation": "2026-10-26 00:00:00",
+ "docstatus": 0,
+ "doctype": "Dock",
+ "idx": 0,
+ "items": [
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "quality-seal-soft",
+   "link_to": "KRA eTIMS",
+   "link_type": "Sidebar",
+   "title": "KRA eTIMS"
+  }
+ ],
+ "modified": "2026-10-26 00:00:00.000000",
+ "modified_by": "Administrator",
+ "mount_on": "erpnext",
+ "name": "royce_etims",
+ "owner": "Administrator",
+ "standard": 1,
+ "user": ""
+}

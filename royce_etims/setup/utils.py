@@ -38,6 +38,17 @@ def before_tests():
 				"chart_of_accounts": "Standard",
 			}
 		)
+	elif not frappe.db.exists("Company", TEST_COMPANY):
+		# A shared test site already has other companies, so the wizard above never ran.
+		frappe.get_doc(
+			{
+				"doctype": "Company",
+				"company_name": TEST_COMPANY,
+				"abbr": "ETC",
+				"default_currency": "KES",
+				"country": "Kenya",
+			}
+		).insert(ignore_permissions=True)
 
 	enable_all_roles_and_domains()
 	frappe.db.commit()  # nosemgrep
