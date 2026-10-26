@@ -707,6 +707,19 @@ just a config change.
   mismatch. Expected: 0.00, Found: 8.0"), `stockRlsDt` is required, and `receipt.trdeNm` is
   capped at 20 characters. The only remaining rejection is branch 02's stuck invcNo counter
   ("Invoice number already exists" for 1, "expected: 1" for anything else) - with KRA support.
+- **Customer PINs (2026-10-26).** `customerPinInfo` is **not a PIN checker**: it lists the
+  customers this branch registered via `branchSendCustomerInfo` and ignores any PIN passed in
+  (`custmTin`); our own TIN came back "no search result" before we registered anything. OSCU has
+  no way to verify a PIN against KRA's register - that's GavaConnect's separate PIN Checker API,
+  not subscribed. Built instead: customers with a well-formed KRA PIN are registered with KRA on
+  save (`etims_sync/customer.py`). `custNo` is capped at 15 characters, so each customer gets an
+  `RC-########` number; `custNm` took 82 characters fine; re-sending an existing customer is
+  accepted (unlike `saveItem`), so edits update KRA.
+- **Purchases: deferred, not blocked on code.** `sendPurchaseTransactionInfo` only confirms a
+  purchase KRA already holds from the supplier's own signed sale (a made-up supplier invoice came
+  back "There is no search result"), and `getPurchaseTransactionInfo` is empty because no supplier
+  has invoiced TIN P051909825V. Plan: once branch 02 can sign, sell from our TIN to our own TIN
+  to create a real purchase record, then build against its actual shape.
 
 ---
 

@@ -172,6 +172,9 @@ doc_events = {
 		],
 		"on_cancel": "royce_etims.etims_sync.stock.on_cancel",
 	},
+	"Customer": {
+		"on_update": "royce_etims.etims_sync.customer.on_update",
+	},
 	"Purchase Receipt": _STOCK_EVENTS,
 	"Purchase Invoice": _STOCK_EVENTS,
 	"Delivery Note": _STOCK_EVENTS,

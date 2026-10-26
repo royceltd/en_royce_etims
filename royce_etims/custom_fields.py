@@ -172,6 +172,40 @@ def _receipt_fields(insert_after):
 
 
 CUSTOM_FIELDS = {
+	# A customer with a KRA PIN is registered with KRA (branchSendCustomerInfo)
+	# - see etims_sync/customer.py.
+	"Customer": [
+		{
+			"fieldname": "royce_etims_customer_status",
+			"fieldtype": "Select",
+			"label": "eTIMS Registration",
+			"options": "Not Synced\nSynced\nFailed",
+			"default": "Not Synced",
+			"read_only": 1,
+			"no_copy": 1,
+			"insert_after": "tax_id",
+			"depends_on": "eval:doc.tax_id",
+		},
+		{
+			"fieldname": "royce_etims_customer_no",
+			"fieldtype": "Data",
+			"label": "eTIMS Customer No (custNo)",
+			"read_only": 1,
+			"no_copy": 1,
+			"insert_after": "royce_etims_customer_status",
+			"depends_on": "eval:doc.royce_etims_customer_no",
+			"description": "Assigned on first registration - KRA caps custNo at 15 characters, so the Customer ID can't be used.",
+		},
+		{
+			"fieldname": "royce_etims_customer_error",
+			"fieldtype": "Small Text",
+			"label": "eTIMS Registration Error",
+			"read_only": 1,
+			"no_copy": 1,
+			"insert_after": "royce_etims_customer_no",
+			"depends_on": "eval:doc.royce_etims_customer_status=='Failed'",
+		},
+	],
 	"Item": [
 		{
 			"fieldname": "royce_etims_section",
