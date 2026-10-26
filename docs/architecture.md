@@ -742,6 +742,9 @@ just a config change.
     `dcRt`. Such a line is split: 6 x 15.23 + 1 x 15.24. Fractional quantities that don't divide
     are refused (price them VAT-inclusive).
   - KRA checks a sale against its own stock balance ("Insufficient stock ... You only have 12").
+    **Open with KRA:** for KE2NTBA0000005 every stockIO (sarNo 7-12) and every save/stockMaster
+    was accepted, the last rsdQty being 9 - matching ERPNext - yet the sale check reported 12.
+    KRA's sale-time stock check apparently counts differently from its own stock master.
 
 ---
 
