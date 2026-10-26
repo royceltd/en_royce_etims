@@ -149,13 +149,30 @@ after_install = "royce_etims.setup.after_install"
 # Which doctypes can trigger an eTIMS sign call is gated per-company by
 # eTIMS Settings.sign_pos_invoices / sign_sales_invoices - see
 # royce_etims.etims_sync.receipt for why both point at the same handler.
+#
+# Every stock voucher also reports its stock in/out to KRA (gated by
+# eTIMS Settings.sync_stock_movements) - see royce_etims.etims_sync.stock.
+_STOCK_EVENTS = {
+	"on_submit": "royce_etims.etims_sync.stock.on_submit",
+	"on_cancel": "royce_etims.etims_sync.stock.on_cancel",
+}
+
 doc_events = {
 	"POS Invoice": {
 		"on_submit": "royce_etims.etims_sync.receipt.on_submit",
 	},
 	"Sales Invoice": {
-		"on_submit": "royce_etims.etims_sync.receipt.on_submit",
+		"on_submit": [
+			"royce_etims.etims_sync.receipt.on_submit",
+			"royce_etims.etims_sync.stock.on_submit",
+		],
+		"on_cancel": "royce_etims.etims_sync.stock.on_cancel",
 	},
+	"Purchase Receipt": _STOCK_EVENTS,
+	"Purchase Invoice": _STOCK_EVENTS,
+	"Delivery Note": _STOCK_EVENTS,
+	"Stock Entry": _STOCK_EVENTS,
+	"Stock Reconciliation": _STOCK_EVENTS,
 }
 
 # Scheduled Tasks
@@ -163,7 +180,10 @@ doc_events = {
 
 scheduler_events = {
 	"cron": {
-		"*/15 * * * *": ["royce_etims.etims_sync.receipt.retry_failed_receipts"],
+		"*/15 * * * *": [
+			"royce_etims.etims_sync.receipt.retry_failed_receipts",
+			"royce_etims.etims_sync.stock.retry_pending_movements",
+		],
 	},
 	"weekly": ["royce_etims.etims_sync.reference_data.sync_all_companies"],
 }

@@ -18,6 +18,7 @@
   "cmc_key",
   "registered_on",
   "last_invoice_no",
+  "last_sar_no",
   "sdc_id",
   "dvc_id",
   "mrc_no"
@@ -95,6 +96,14 @@
    "read_only": 1
   },
   {
+   "default": "0",
+   "description": "Last sarNo KRA accepted for this device. Resyncs itself when KRA reports a different expected number.",
+   "fieldname": "last_sar_no",
+   "fieldtype": "Int",
+   "label": "Last Stock Movement No (sarNo)",
+   "read_only": 1
+  },
+  {
    "description": "Sales/Control Device ID returned alongside cmcKey at registration.",
    "fieldname": "sdc_id",
    "fieldtype": "Data",
@@ -119,7 +128,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-16 15:22:27.027947",
+ "modified": "2026-10-26 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "KRA eTIMS",
  "name": "eTIMS Branch",

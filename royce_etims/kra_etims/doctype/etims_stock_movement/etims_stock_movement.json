@@ -1,0 +1,170 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "ETIMS-SM-.#####",
+ "creation": "2026-10-26 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "branch",
+  "voucher_type",
+  "voucher_no",
+  "posting_date",
+  "column_break_status",
+  "direction",
+  "sar_ty_cd",
+  "status",
+  "sar_no",
+  "retry_count",
+  "reverses",
+  "error",
+  "items_section",
+  "items"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "eTIMS Branch",
+   "options": "eTIMS Branch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "voucher_type",
+   "fieldtype": "Link",
+   "label": "Voucher Type",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "voucher_no",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "label": "Voucher No",
+   "options": "voucher_type",
+   "reqd": 1
+  },
+  {
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Posting Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Direction",
+   "options": "In\nOut",
+   "reqd": 1
+  },
+  {
+   "description": "KRA Stock I/O Type (code class 12), e.g. 02 Purchase, 11 Sale, 06/16 Adjustment.",
+   "fieldname": "sar_ty_cd",
+   "fieldtype": "Data",
+   "label": "Stock I/O Type (sarTyCd)",
+   "reqd": 1
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nSent\nFailed\nStock Master Failed\nCancelled",
+   "read_only": 1
+  },
+  {
+   "description": "Assigned by the branch's sequence when KRA accepts the movement.",
+   "fieldname": "sar_no",
+   "fieldtype": "Int",
+   "label": "Stock Movement No (sarNo)",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "retry_count",
+   "fieldtype": "Int",
+   "label": "Retry Count",
+   "read_only": 1
+  },
+  {
+   "description": "Set on the movement created when a stock voucher is cancelled.",
+   "fieldname": "reverses",
+   "fieldtype": "Link",
+   "label": "Reverses",
+   "options": "eTIMS Stock Movement",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "read_only": 1
+  },
+  {
+   "fieldname": "items_section",
+   "fieldtype": "Section Break",
+   "label": "Items"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "eTIMS Stock Movement Item",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "in_create": 1,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-26 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "KRA eTIMS",
+ "name": "eTIMS Stock Movement",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 0,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager"
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "voucher_no"
+}

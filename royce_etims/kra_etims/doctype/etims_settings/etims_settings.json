@@ -20,6 +20,7 @@
   "sign_section",
   "sign_pos_invoices",
   "sign_sales_invoices",
+  "sync_stock_movements",
   "receipt_section",
   "receipt_trade_name",
   "receipt_address",
@@ -70,10 +71,10 @@
    "options": "eTIMS Branch"
   },
   {
+   "description": "Confirmed 2026-09-10: /initialize rejects with 401 'Unauthorised-Invalid Access Token' without these. From an App created on the GavaConnect developer portal (developer.go.ke) subscribed to the eTIMS OSCU product - a separate step from the eTIMS Taxpayer Portal's Service Request/Integration Token. See docs/architecture.md.",
    "fieldname": "gavaconnect_section",
    "fieldtype": "Section Break",
-   "label": "GavaConnect App Credentials",
-   "description": "Confirmed 2026-09-10: /initialize rejects with 401 'Unauthorised-Invalid Access Token' without these. From an App created on the GavaConnect developer portal (developer.go.ke) subscribed to the eTIMS OSCU product - a separate step from the eTIMS Taxpayer Portal's Service Request/Integration Token. See docs/architecture.md."
+   "label": "GavaConnect App Credentials"
   },
   {
    "fieldname": "gavaconnect_consumer_key",
@@ -115,10 +116,17 @@
    "label": "Sign Sales Invoices (credit/general)"
   },
   {
+   "default": "1",
+   "description": "Send stock in/out (purchases, sales with stock, stock entries, reconciliations) to KRA. KRA rejects a sale for an item it has no stock record for.",
+   "fieldname": "sync_stock_movements",
+   "fieldtype": "Check",
+   "label": "Sync Stock Movements"
+  },
+  {
+   "description": "Feeds the nested \"receipt\" object KRA's sendSalesTransaction expects (confirmed real shape: eTIMS-OSCU-Integrator-Automated-Testing-Sandbox.json) - what actually prints on the fiscal receipt, separate from the invoice's own line items.",
    "fieldname": "receipt_section",
    "fieldtype": "Section Break",
-   "label": "Receipt Branding",
-   "description": "Feeds the nested \"receipt\" object KRA's sendSalesTransaction expects (confirmed real shape: eTIMS-OSCU-Integrator-Automated-Testing-Sandbox.json) - what actually prints on the fiscal receipt, separate from the invoice's own line items."
+   "label": "Receipt Branding"
   },
   {
    "description": "Shown as the receipt's trade name (trdeNm). Falls back to the Company's name if left blank.",
@@ -152,7 +160,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-16 15:22:26.422447",
+ "modified": "2026-10-26 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "KRA eTIMS",
  "name": "eTIMS Settings",

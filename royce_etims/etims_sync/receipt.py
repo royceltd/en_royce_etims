@@ -49,6 +49,7 @@ from royce_etims.utils.api_client import request as etims_request
 from royce_etims.utils.config import PRODUCTION_QR_VERIFY_BASE_URL, SANDBOX_QR_VERIFY_BASE_URL
 from royce_etims.utils.id_mapping import get_etims_id
 from royce_etims.utils.qr_code import build_verification_url, generate_qr_data_uri
+from royce_etims.utils.sequence import lock_branch, send_in_sequence
 from royce_etims.utils.validation import validate_kra_pin
 
 MAX_RETRY_COUNT = 5
@@ -93,9 +94,9 @@ def on_submit(doc, method=None):
 	branch_name = doc.royce_etims_branch or settings.default_branch
 	if not branch_name:
 		frappe.throw(
-			_("eTIMS is Active for {0} but no eTIMS Branch is set on this document, and the company has no Default Branch configured.").format(
-				doc.company
-			)
+			_(
+				"eTIMS is Active for {0} but no eTIMS Branch is set on this document, and the company has no Default Branch configured."
+			).format(doc.company)
 		)
 
 	doc.db_set("royce_etims_branch", branch_name, notify=False)
@@ -117,26 +118,37 @@ def sync_receipt(doctype, name):
 
 	if branch.device_status not in ("Registered", "Active"):
 		doc.db_set("royce_etims_status", "Failed", notify=False)
-		doc.db_set("royce_etims_error", _("eTIMS Branch {0} has no registered device.").format(branch.name), notify=False)
+		doc.db_set(
+			"royce_etims_error",
+			_("eTIMS Branch {0} has no registered device.").format(branch.name),
+			notify=False,
+		)
 		return
 
-	invc_no = _next_invoice_number(branch.name)
+	lock_branch(branch.name)
+	# A locking read: a plain one would see this transaction's older snapshot.
+	if frappe.db.get_value(doctype, name, "royce_etims_status", for_update=True) == "Sent":
+		frappe.db.rollback()
+		return  # another job (e.g. the retry sweep) already signed it
 
-	try:
-		payload = build_receipt_payload(doc, invc_no, settings)
-		data = etims_request(
+	def send(invc_no):
+		return etims_request(
 			doc.company,
 			"sendSalesTransaction",
-			payload=payload,
+			payload=build_receipt_payload(doc, invc_no, settings),
 			method="POST",
 			branch=branch,
 			reference_doctype=doctype,
 			reference_name=doc.name,
 		)
+
+	try:
+		invc_no, data = send_in_sequence(branch.name, "last_invoice_no", send)
 	except Exception as e:
+		# No invoice number is recorded: KRA didn't accept one, so the next
+		# attempt (this invoice's retry, or another invoice) reuses it.
 		doc.db_set("royce_etims_status", "Failed", notify=False)
 		doc.db_set("royce_etims_error", str(e)[:140], notify=False)
-		doc.db_set("royce_etims_invoice_number", invc_no, notify=False)  # number is consumed either way - never reused
 		doc.db_set("royce_etims_retry_count", (doc.royce_etims_retry_count or 0) + 1, notify=False)
 		frappe.db.commit()
 		return
@@ -177,11 +189,15 @@ def _apply_success(doc, invc_no, data, settings, branch):
 		frappe.log_error(title=f"eTIMS: no rcptSign in successful response for {doc.name}")
 		return
 
-	qr_verify_base_url = SANDBOX_QR_VERIFY_BASE_URL if settings.environment == "Sandbox" else PRODUCTION_QR_VERIFY_BASE_URL
+	qr_verify_base_url = (
+		SANDBOX_QR_VERIFY_BASE_URL if settings.environment == "Sandbox" else PRODUCTION_QR_VERIFY_BASE_URL
+	)
 	if not qr_verify_base_url:
 		return
 
-	verification_url = build_verification_url(qr_verify_base_url, settings.tin, branch.bhf_id, receipt_signature)
+	verification_url = build_verification_url(
+		qr_verify_base_url, settings.tin, branch.bhf_id, receipt_signature
+	)
 	doc.db_set("royce_etims_qr_verification_url", verification_url, notify=False)
 	doc.db_set("royce_etims_qr_code", generate_qr_data_uri(verification_url), notify=False)
 
@@ -210,23 +226,6 @@ def retry_failed_receipts():
 			)
 
 
-def _next_invoice_number(branch_name):
-	"""Atomic per-branch sequence - KRA requires strictly sequential invcNo.
-	Shared across Sales Invoice and POS Invoice: KRA's sequence is per device
-	(branch), not per ERPNext doctype."""
-	row = frappe.db.sql(
-		"SELECT last_invoice_no FROM `tabeTIMS Branch` WHERE name=%s FOR UPDATE",
-		branch_name,
-		as_dict=True,
-	)
-	if not row:
-		frappe.throw(_("eTIMS Branch {0} not found.").format(branch_name))
-
-	next_no = (row[0].last_invoice_no or 0) + 1
-	frappe.db.set_value("eTIMS Branch", branch_name, "last_invoice_no", next_no, update_modified=False)
-	return next_no
-
-
 def _build_receipt_block(doc, settings):
 	"""KRA's nested `receipt` object - drives what actually prints on the
 	fiscal receipt (trade name, address, header/footer messages), separate
@@ -242,7 +241,9 @@ def _build_receipt_block(doc, settings):
 	multiple addresses/trade names on its invoices isn't flattened to one
 	fixed value.
 	"""
-	trade_name = settings.get("receipt_trade_name") or frappe.db.get_value("Company", doc.company, "company_name")
+	trade_name = settings.get("receipt_trade_name") or frappe.db.get_value(
+		"Company", doc.company, "company_name"
+	)
 
 	address = ""
 	if doc.get("company_address"):
@@ -287,9 +288,9 @@ def build_receipt_payload(doc, invc_no, settings):
 		item_cd = get_etims_id(item, doc.company)
 		if not item_cd:
 			frappe.throw(
-				_("Item {0} has no eTIMS Item Code assigned for {1} yet. Sync it before submitting this document.").format(
-					d.item_code, doc.company
-				)
+				_(
+					"Item {0} has no eTIMS Item Code assigned for {1} yet. Sync it before submitting this document."
+				).format(d.item_code, doc.company)
 			)
 
 		code = item.royce_etims_taxation_type_code or "A"

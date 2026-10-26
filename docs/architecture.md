@@ -673,6 +673,21 @@ just a config change.
   properly"), so a registered item can't be re-sent or updated - re-syncing now checks `itemInfo`
   first and just marks the Item Synced. How KRA expects item *changes* (price, `useYn` to retire
   an item) to be reported is still open.
+- **Stock sync built (2026-10-26, `etims_sync/stock.py`).** KRA rejects a sale for an item with no
+  stock record, so every submitted stock voucher (Purchase Receipt/Invoice, Delivery Note, Sales
+  Invoice with stock, Stock Entry, Stock Reconciliation) creates an `eTIMS Stock Movement` from its
+  Stock Ledger Entries, queued per branch and sent strictly in order: `insert/stockIO` then
+  `save/stockMaster`. Cancelling an accepted movement sends a reversing adjustment (`orgSarNo` =
+  the original). Confirmed live: sarNo 7 (receipt 10), 8 (issue 2), 9 (reversal), KRA balance =
+  ERPNext Bin. Two live findings: **`prc` is VAT-inclusive** (KRA recomputes `taxblAmt` =
+  total / 1.16), and **`rsdQty` must equal KRA's own sum of our stockIO calls**, so it's computed
+  from accepted movements, not from Bin.
+- **Number sequences fixed (2026-10-26, `utils/sequence.py`).** The old receipt code consumed an
+  invcNo even when KRA rejected the call ("never reused"), which leaves a gap KRA then rejects
+  forever. Now a number only advances when KRA accepts it, the branch row is locked for the whole
+  call, and when KRA names the number it expected ("Invalid sarNo: Expected: 7 but found: 8620")
+  the counter resyncs and resends once. Shared by invcNo and sarNo. The parser only trusts
+  messages naming invcNo/sarNo - KRA uses the same "Expected:" wording for amounts.
 
 ---
 
