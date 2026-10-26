@@ -89,6 +89,9 @@ jobs:
         working-directory: /home/runner/frappe-bench
         run: |
           bench get-app erpnext --branch version-16
+          # royce_etims requires kenyan_accountant (hooks.py required_apps):
+          # without it install-app stops before any test runs.
+          bench get-app kenyan_accountant https://github.com/royceltd/en_kenyan_accountant --branch version-16
           bench get-app royce_etims $GITHUB_WORKSPACE
           bench setup requirements --dev
           bench new-site --db-root-password root --admin-password admin test_site
