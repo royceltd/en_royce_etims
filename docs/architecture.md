@@ -697,6 +697,16 @@ just a config change.
   until KRA fixes branch 02's invcNo counter. Return stock is confirmed live (sarNo 11, type 03).
   The seven reference lists are now readable by every Desk User (they were System Manager only,
   so a cashier couldn't pick a refund reason, nor an Item Manager a classification).
+- **Compliance reports (2026-10-26).** *eTIMS Compliance Status* lists everything KRA hasn't
+  accepted (unsigned invoices/credit notes, unsent stock movements, unregistered items) with
+  error, age and retries; *eTIMS VAT Summary* totals taxable/VAT per band from the payloads KRA
+  accepted (credit notes subtracted), so it matches what KRA holds. Both in the sidebar's
+  Compliance section.
+- **Invoice payload now passes all of KRA's content checks (2026-10-26)**, found by signing one
+  real Sales Invoice: a band KRA has disabled must report rate 0 ("Rule taxRtE failed: Tax rate
+  mismatch. Expected: 0.00, Found: 8.0"), `stockRlsDt` is required, and `receipt.trdeNm` is
+  capped at 20 characters. The only remaining rejection is branch 02's stuck invcNo counter
+  ("Invoice number already exists" for 1, "expected: 1" for anything else) - with KRA support.
 
 ---
 

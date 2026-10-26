@@ -129,10 +129,11 @@
    "label": "Receipt Branding"
   },
   {
-   "description": "Shown as the receipt's trade name (trdeNm). Falls back to the Company's name if left blank.",
+   "description": "Printed on the KRA receipt. KRA allows at most 20 characters; defaults to the Company name, cut to 20.",
    "fieldname": "receipt_trade_name",
    "fieldtype": "Data",
-   "label": "Trade Name"
+   "label": "Trade Name",
+   "length": 20
   },
   {
    "description": "Shown as the receipt's address (adrs) when the invoice itself has no Company Address set. Leave blank to send an empty address in that case rather than guess one.",
@@ -160,7 +161,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-26 12:00:00.000000",
+ "modified": "2026-10-26 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "KRA eTIMS",
  "name": "eTIMS Settings",

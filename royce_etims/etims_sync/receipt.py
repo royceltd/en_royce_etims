@@ -62,14 +62,20 @@ SIGN_SETTING_FIELD = {
 
 TAX_CODES = ("A", "B", "C", "D", "E")
 
+TRADE_NAME_MAX_LENGTH = 20
+
 
 def _get_tax_rates():
 	"""Live lookup against eTIMS Taxation Type, replacing what used to be a
 	hardcoded TAX_RATE_BY_CODE dict - same values today (seeded from the same
-	one data point), but now correctable via the UI, not a deploy."""
+	one data point), but now correctable via the UI, not a deploy.
+
+	A band KRA has disabled reports rate 0 - CONFIRMED 2026-10-26 with E
+	(VAT 8%, useYn "N"): "Rule taxRtE failed: Tax rate mismatch. Expected:
+	0.00, Found: 8.0"."""
 	rates = dict.fromkeys(TAX_CODES, 0)
-	for row in frappe.get_all("eTIMS Taxation Type", fields=["code", "rate"]):
-		if row.code in rates:
+	for row in frappe.get_all("eTIMS Taxation Type", fields=["code", "rate", "disabled"]):
+		if row.code in rates and not row.disabled:
 			rates[row.code] = row.rate or 0
 	return rates
 
@@ -262,7 +268,9 @@ def _build_receipt_block(doc, settings):
 		# to differ. Revisit if/when reprints are ever supported.
 		"rptNo": 1,
 		"rcptPbctDt": now_datetime().strftime("%Y%m%d%H%M%S"),
-		"trdeNm": trade_name or "",
+		# KRA caps this at 20 characters - CONFIRMED 2026-10-26: "<receipt>
+		# <trdeNm> : length must be between 0 and 20" for "Royce Technologies Ltd".
+		"trdeNm": (trade_name or "")[:TRADE_NAME_MAX_LENGTH],
 		"adrs": address,
 		"topMsg": settings.get("receipt_top_message") or "",
 		"btmMsg": settings.get("receipt_bottom_message") or "",
@@ -387,7 +395,8 @@ def build_receipt_payload(doc, invc_no, settings):
 		"salesSttsCd": "02",
 		"cfmDt": posting_date.strftime("%Y%m%d") + "000000",
 		"salesDt": posting_date.strftime("%Y%m%d"),
-		"stockRlsDt": None,
+		# Required - CONFIRMED 2026-10-26: "StockRlsDt cannot be null or empty".
+		"stockRlsDt": posting_date.strftime("%Y%m%d") + "000000",
 		"cnclReqDt": None,
 		"cnclDt": None,
 		"rfdDt": posting_date.strftime("%Y%m%d") + "000000" if is_return else None,

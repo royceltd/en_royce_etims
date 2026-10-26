@@ -22,6 +22,7 @@ from frappe.tests import IntegrationTestCase
 from royce_etims.etims_sync.receipt import (
 	_apply_success,
 	_build_receipt_block,
+	_get_tax_rates,
 	_original_invoice_number,
 	build_receipt_payload,
 )
@@ -284,6 +285,7 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 		self.assertEqual(payload["orgInvcNo"], 11)
 		self.assertEqual(payload["rfdRsnCd"], "03")
 		self.assertEqual(payload["rfdDt"], "20261026000000")
+		self.assertEqual(payload["stockRlsDt"], "20261026000000")
 		self.assertEqual(payload["totAmt"], 1000)
 		line = payload["itemList"][0]
 		self.assertEqual((line["qty"], line["prc"], line["totAmt"]), (1, 1000, 1000))
@@ -297,3 +299,18 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 				_original_invoice_number(doc)
 		with patch("frappe.db.get_value", return_value=("Sent", 11)):
 			self.assertEqual(_original_invoice_number(doc), 11)
+
+	def test_disabled_tax_band_reports_zero_rate(self):
+		"""KRA rejects taxRtE 8 while it has E (VAT 8%) disabled - confirmed live."""
+		frappe.db.set_value("eTIMS Taxation Type", "E", {"rate": 8, "disabled": 1})
+		frappe.db.set_value("eTIMS Taxation Type", "B", {"rate": 16, "disabled": 0})
+		rates = _get_tax_rates()
+		self.assertEqual(rates["E"], 0)
+		self.assertEqual(rates["B"], 16)
+
+	def test_trade_name_is_capped_at_kra_limit(self):
+		settings = frappe.get_doc(
+			{"doctype": "eTIMS Settings", "receipt_trade_name": "Royce Technologies Limited Nairobi"}
+		)
+		doc = frappe._dict(company=TEST_COMPANY, tax_id=None, contact_mobile=None, company_address=None)
+		self.assertEqual(len(_build_receipt_block(doc, settings)["trdeNm"]), 20)
