@@ -15,7 +15,13 @@ for what these specific checks need covered.
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from royce_etims.etims_sync.item import REQUIRED_ETIMS_ITEM_FIELDS, _validate_ready_to_sync, build_item_payload
+from royce_etims.etims_sync.item import (
+	REQUIRED_ETIMS_ITEM_FIELDS,
+	_validate_ready_to_sync,
+	build_item_payload,
+	item_code_prefix,
+	next_item_code,
+)
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
 IGNORE_TEST_RECORD_DEPENDENCIES = []
@@ -31,6 +37,8 @@ def _complete_item(**overrides):
 		royce_etims_item_type="2",
 		royce_etims_taxation_type="B",
 		royce_etims_origin_nation="KE",
+		royce_etims_packaging_unit="NT",
+		royce_etims_quantity_unit="BA",
 		royce_etims_id_mapping=[],
 	)
 	item.update(overrides)
@@ -61,12 +69,41 @@ class IntegrationTestItemSync(IntegrationTestCase):
 		# Should not raise.
 		_validate_ready_to_sync(item, "Royce Technologies LTD")
 
-	def test_missing_item_code_mapping_raises(self):
-		"""A complete eTIMS profile still isn't enough without an assigned
-		itemCd for this company - a separate, deliberate manual step."""
-		item = _complete_item(royce_etims_id_mapping=[])
-		with self.assertRaises(frappe.ValidationError):
-			_validate_ready_to_sync(item, "Royce Technologies LTD")
+	def test_item_without_code_mapping_is_ready_to_sync(self):
+		"""itemCd is generated at sync time now, so a missing mapping is no
+		longer a reason to block."""
+		_validate_ready_to_sync(_complete_item(royce_etims_id_mapping=[]), "Royce Technologies LTD")
+
+	def test_packaging_and_quantity_unit_are_required(self):
+		for field in ("royce_etims_packaging_unit", "royce_etims_quantity_unit"):
+			self.assertIn(field, REQUIRED_ETIMS_ITEM_FIELDS)
+			with self.assertRaises(frappe.ValidationError):
+				_validate_ready_to_sync(_complete_item(**{field: None}), "Royce Technologies LTD")
+
+	def test_item_code_prefix_order(self):
+		item = frappe._dict(
+			royce_etims_origin_nation_code="KE",
+			royce_etims_item_type_code="2",
+			royce_etims_packaging_unit_code="NT",
+			royce_etims_quantity_unit_code="BA",
+		)
+		self.assertEqual(item_code_prefix(item), "KE2NTBA")
+
+	def test_next_item_code_follows_kra_sequence_per_prefix(self):
+		"""Real sandbox itemInfo for TIN P051909825V, 2026-10-26: mixed 7- and
+		8-digit tails under KE2NTBA, plus other prefixes that must not count."""
+		known = [
+			"KE1NTXU1000005",
+			"KE2NTBA00000001",
+			"KE2NTBA00000002",
+			"KE2NTBA00000003",
+			"KE2NTBA0000004",
+			"KE3BAXBAX00002",
+		]
+		self.assertEqual(next_item_code("KE2NTBA", known), "KE2NTBA0000005")
+
+	def test_next_item_code_starts_at_one_for_a_new_prefix(self):
+		self.assertEqual(next_item_code("KE3NTU", ["KE2NTBA0000004", None]), "KE3NTU0000001")
 
 	def test_prevent_etims_submission_raises_regardless_of_other_fields(self):
 		item = _complete_item(royce_prevent_etims_submission=1)

@@ -665,6 +665,14 @@ just a config change.
   Taxation Type's rate comes from `userDfnCd1`; Item Classification gets KRA's suggested
   `taxation_type`. Runs from an eTIMS Settings button and weekly via the scheduler. The sandbox
   returns only 26 item classifications - production should carry the full catalogue.
+- **itemCd is generated, not typed (2026-10-26, `etims_sync/item.py`).** Format: origin + item type
+  + packaging unit + quantity unit + 7-digit sequence (`KE2NTBA0000005`). Confirmed live: KRA
+  enforces the sequence ("Expected sequence ending with: ********4"), the next number is read from
+  `itemInfo` at sync time, and the code is stored only after `saveItem` succeeds. Also confirmed:
+  **`saveItem` rejects an itemCd KRA already holds** ("either reused or not incremented
+  properly"), so a registered item can't be re-sent or updated - re-syncing now checks `itemInfo`
+  first and just marks the Item Synced. How KRA expects item *changes* (price, `useYn` to retire
+  an item) to be reported is still open.
 
 ---
 
