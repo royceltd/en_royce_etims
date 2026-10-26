@@ -25,6 +25,7 @@ from royce_etims.etims_sync.receipt import (
 	_get_tax_rates,
 	_original_invoice_number,
 	build_receipt_payload,
+	retry_receipt,
 )
 from royce_etims.setup.utils import TEST_COMPANY
 
@@ -314,3 +315,30 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 		)
 		doc = frappe._dict(company=TEST_COMPANY, tax_id=None, contact_mobile=None, company_address=None)
 		self.assertEqual(len(_build_receipt_block(doc, settings)["trdeNm"]), 20)
+
+	def _retry_with(self, **fields):
+		doc = _FakeInvoiceDoc(
+			**{"docstatus": 1, "royce_etims_status": "Failed", "royce_etims_retry_count": 5, **fields}
+		)
+		doc.check_permission = lambda ptype: None
+		doc.db_set = lambda values, notify=False: doc.__dict__.update(values)
+		with (
+			patch("frappe.get_doc", return_value=doc),
+			patch("royce_etims.etims_sync.receipt._enqueue_sync") as enqueue,
+		):
+			retry_receipt("Sales Invoice", "SINV-RETRY-TEST")
+		return doc, enqueue
+
+	def test_retry_resets_budget_and_queues(self):
+		doc, enqueue = self._retry_with()
+		self.assertEqual((doc.royce_etims_status, doc.royce_etims_retry_count), ("Pending", 0))
+		enqueue.assert_called_once_with("Sales Invoice", "SINV-RETRY-TEST")
+
+	def test_retry_refuses_signed_or_draft_documents(self):
+		for fields in ({"royce_etims_status": "Sent"}, {"docstatus": 0}):
+			with self.assertRaises(frappe.ValidationError):
+				self._retry_with(**fields)
+
+	def test_retry_refuses_other_doctypes(self):
+		with self.assertRaises(frappe.ValidationError):
+			retry_receipt("Purchase Invoice", "PINV-0001")

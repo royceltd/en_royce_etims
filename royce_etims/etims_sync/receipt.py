@@ -111,12 +111,20 @@ def on_submit(doc, method=None):
 	doc.db_set("royce_etims_branch", branch_name, notify=False)
 	doc.db_set("royce_etims_status", "Pending", notify=False)
 
+	_enqueue_sync(doc.doctype, doc.name)
+
+
+def _enqueue_sync(doctype, name):
+	"""One queued sync per document at a time - the submit hook, the retry
+	sweep and the Retry button can all ask for the same one."""
 	frappe.enqueue(
 		"royce_etims.etims_sync.receipt.sync_receipt",
 		queue="short",
 		enqueue_after_commit=True,
-		doctype=doc.doctype,
-		name=doc.name,
+		job_id=f"royce_etims_receipt::{doctype}::{name}",
+		deduplicate=True,
+		doctype=doctype,
+		name=name,
 	)
 
 
@@ -227,12 +235,24 @@ def retry_failed_receipts():
 			limit_page_length=50,
 		)
 		for name in names:
-			frappe.enqueue(
-				"royce_etims.etims_sync.receipt.sync_receipt",
-				queue="short",
-				doctype=doctype,
-				name=name,
-			)
+			_enqueue_sync(doctype, name)
+
+
+@frappe.whitelist()
+def retry_receipt(doctype, name):
+	""""Retry eTIMS" on a Sales/POS Invoice: starts the retry budget over and
+	queues the normal sync, so the branch lock and Sent re-check still apply."""
+	if doctype not in SIGN_SETTING_FIELD:
+		frappe.throw(_("eTIMS signing doesn't apply to {0}.").format(doctype))
+
+	doc = frappe.get_doc(doctype, name)
+	doc.check_permission("submit")
+	if doc.docstatus != 1 or doc.royce_etims_status not in ("Pending", "Failed"):
+		frappe.throw(_("Only a submitted document that eTIMS hasn't signed yet can be retried."))
+
+	doc.db_set({"royce_etims_status": "Pending", "royce_etims_retry_count": 0}, notify=True)
+	_enqueue_sync(doctype, name)
+	return _("Queued {0} for eTIMS signing.").format(name)
 
 
 def _build_receipt_block(doc, settings):
