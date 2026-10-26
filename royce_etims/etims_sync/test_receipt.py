@@ -58,12 +58,9 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 		"""No receipt_trade_name/receipt_address configured - should fall back
 		to the Company's own name, and send an empty (not guessed) address.
 
-		Uses ERPNext's "_Test Company" fixture rather than TEST_COMPANY here
-		on purpose: TEST_COMPANY is only created by setup/utils.before_tests'
-		`if not frappe.get_list("Company")` guard, which no-ops on any bench
-		that already has *a* company (e.g. this shared dev site, which has
-		"Royce Technologies LTD") - so TEST_COMPANY isn't reliably present.
-		The DB-fallback being tested here just needs *some* real Company row.
+		Uses TEST_COMPANY: setup/utils.before_tests creates it on every site,
+		including ones that already have other companies. ERPNext's "_Test
+		Company" fixture (used here previously) doesn't exist on a clean site.
 		"""
 		settings = frappe.get_doc(
 			{
@@ -72,7 +69,7 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 				"receipt_bottom_message": "Thank you, shop with us again",
 			}
 		)
-		company = "_Test Company"
+		company = TEST_COMPANY
 		expected_trade_name = frappe.db.get_value("Company", company, "company_name")
 		doc = frappe._dict(
 			company=company,
@@ -162,7 +159,12 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 		# live while writing it: taxTyCd came back "A", not "B").
 		if not frappe.db.exists("eTIMS Settings", TEST_COMPANY):
 			frappe.get_doc(
-				{"doctype": "eTIMS Settings", "company": TEST_COMPANY, "tin": "A123456789Z", "environment": "Sandbox"}
+				{
+					"doctype": "eTIMS Settings",
+					"company": TEST_COMPANY,
+					"tin": "A123456789Z",
+					"environment": "Sandbox",
+				}
 			).insert(ignore_permissions=True, ignore_links=True)
 
 		item = frappe.get_doc(
@@ -175,7 +177,11 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 				"is_stock_item": 0,
 				"royce_etims_taxation_type": "B",  # 16% - seeded rate, confirmed real
 				"royce_etims_id_mapping": [
-					{"setup_doctype": "eTIMS Settings", "setup_docname": TEST_COMPANY, "etims_id": "TESTCD00000001"}
+					{
+						"setup_doctype": "eTIMS Settings",
+						"setup_docname": TEST_COMPANY,
+						"etims_id": "TESTCD00000001",
+					}
 				],
 			}
 		)

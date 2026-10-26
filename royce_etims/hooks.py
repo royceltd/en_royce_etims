@@ -165,6 +165,7 @@ scheduler_events = {
 	"cron": {
 		"*/15 * * * *": ["royce_etims.etims_sync.receipt.retry_failed_receipts"],
 	},
+	"weekly": ["royce_etims.etims_sync.reference_data.sync_all_companies"],
 }
 
 # Testing
@@ -255,4 +256,3 @@ before_tests = "royce_etims.setup.utils.before_tests"
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
-

@@ -8,7 +8,8 @@
  "engine": "InnoDB",
  "field_order": [
   "code",
-  "description"
+  "description",
+  "disabled"
  ],
  "fields": [
   {
@@ -24,12 +25,19 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Description"
+  },
+  {
+   "default": "0",
+   "description": "Set from KRA's useYn flag on sync - KRA no longer accepts this code.",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-16 02:11:18.931857",
+ "modified": "2026-10-26 01:00:00.000000",
  "modified_by": "Administrator",
  "module": "KRA eTIMS",
  "name": "eTIMS Packaging Unit",
@@ -51,7 +59,10 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
- "sort_field": "creation",
- "sort_order": "DESC",
- "states": []
+ "search_fields": "description",
+ "show_title_field_in_link": 1,
+ "sort_field": "code",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "description"
 }

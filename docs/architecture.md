@@ -573,8 +573,8 @@ just a config change.
   - `eTIMS Item Classification`, `eTIMS Taxation Type` (carries `rate`), `eTIMS Item Type`,
     `eTIMS Packaging Unit`, `eTIMS Quantity Unit`, `eTIMS Country of Origin` — Link-able reference
     doctypes instead of free-text/Select fields on Item. Only Taxation Type and Item Type are
-    seeded (from real values in the sandbox collection) — the rest are deliberately empty pending
-    real `selectCodeList`/`selectItemClass` sync, not filled with guesses.
+    seeded (from real values in the sandbox collection); all six are now filled from KRA by the
+    `selectCodeList`/`selectItemClass` sync (2026-10-26, see "Open / not yet decided").
   - **`eTIMS ID Mapping`** (generic child table: `setup_doctype` + `setup_docname` + `etims_id`) —
     fixes the multi-company limitation flagged earlier: itemCd is assigned per taxpayer
     registration, not globally to the Item, so it lives in a child table keyed by company
@@ -656,10 +656,15 @@ just a config change.
   confirm before going live.
 - No live round-trip against KRA yet from any environment - see the correction note above. Real
   sandbox credentials are the natural next step once available.
-- `selectCodeList`/`selectItemClass`/`branchList` reference-data sync — the task this correction
-  interrupted. Now unblocked with confirmed endpoint names (`selectCodeList` was already right;
-  `selectItemClass` should be `selectItemClsList`, `branchList` should be `selectBhfList`) - still
-  to be built.
+- ~~`selectCodeList`/`selectItemClass`/`branchList` reference-data sync~~ - **built 2026-10-26**
+  (`etims_sync/reference_data.py`). The endpoint names that actually answer on
+  `sbx.kra.go.ke/etims-oscu/api/v1` are `selectCodeList` and `selectItemClass` (not
+  `selectItemClsList`), and `branchList` (not `selectBhfList`) - confirmed by live calls that day.
+  Code classes 04/05/10/17/24 fill Taxation Type / Country / Quantity Unit / Packaging Unit / Item
+  Type; KRA's `useYn` drives a new `disabled` flag (the sandbox marks **E, VAT 8%, as not in use**);
+  Taxation Type's rate comes from `userDfnCd1`; Item Classification gets KRA's suggested
+  `taxation_type`. Runs from an eTIMS Settings button and weekly via the scheduler. The sandbox
+  returns only 26 item classifications - production should carry the full catalogue.
 
 ---
 
