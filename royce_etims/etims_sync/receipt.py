@@ -173,7 +173,9 @@ def sync_receipt(doctype, name):
 		# No invoice number is recorded: KRA didn't accept one, so the next
 		# attempt (this invoice's retry, or another invoice) reuses it.
 		doc.db_set("royce_etims_status", "Failed", notify=False)
-		doc.db_set("royce_etims_error", str(e)[:140], notify=False)
+		doc.db_set(
+			"royce_etims_error", str(e)[:500], notify=False
+		)  # the whole message: local checks leave no eTIMS Log
 		doc.db_set("royce_etims_retry_count", (doc.royce_etims_retry_count or 0) + 1, notify=False)
 		frappe.db.commit()
 		return
