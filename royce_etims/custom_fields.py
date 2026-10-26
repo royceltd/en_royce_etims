@@ -172,6 +172,19 @@ def _receipt_fields(insert_after):
 
 
 CUSTOM_FIELDS = {
+	# Which eTIMS band an Item Tax Template's lines are signed under - the
+	# template decides the VAT actually charged, so it decides the band too.
+	# The standard KE templates get theirs automatically (tax_lines.py).
+	"Item Tax Template": [
+		{
+			"fieldname": "royce_etims_taxation_type",
+			"fieldtype": "Link",
+			"options": "eTIMS Taxation Type",
+			"label": "eTIMS Taxation Type",
+			"insert_after": "company",
+			"description": "Band KRA records lines using this template under: A Exempt, B 16%, C Zero-rated, D Non-VAT, E 8%.",
+		},
+	],
 	# A customer with a KRA PIN is registered with KRA (branchSendCustomerInfo)
 	# - see etims_sync/customer.py.
 	"Customer": [

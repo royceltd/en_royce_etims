@@ -720,6 +720,28 @@ just a config change.
   back "There is no search result"), and `getPurchaseTransactionInfo` is empty because no supplier
   has invoiced TIN P051909825V. Plan: once branch 02 can sign, sell from our TIN to our own TIN
   to create a real purchase record, then build against its actual shape.
+- **Signed VAT = booked VAT (2026-10-26, `etims_sync/tax_lines.py`).** The payload used to work
+  VAT out itself, assuming VAT-inclusive prices: a VAT-on-top invoice (1,160 + 16%) went as
+  1,160 inclusive and was rejected ("Invalid totAmt . Expected: 1160.00, But Found: 1345.6"), and
+  an invoice with no VAT row would have been signed with VAT the ledger didn't have. Now each line's
+  VAT is read from ERPNext's Item Wise Tax Detail; the band comes from the line's Item Tax Template
+  (new `royce_etims_taxation_type` field, KE templates filled automatically), then the Item, then
+  the rate (16 -> B, 8 -> E; a 0% line must say A, C or D); and signing stops when the band's VAT
+  and the booked VAT disagree, when a non-VAT charge row is present, or when the lines don't add
+  up to the invoice total.
+- **KRA's line arithmetic, all confirmed live 2026-10-26** (KRA validates content before invcNo, so
+  these were learnt with the counter still stuck):
+  - `splyAmt` = `prc` x `qty`, `prc` in whole cents, rounded **half up** (25.37 x 182.50 =
+    4630.025 -> 4630.03). ERPNext's Banker's Rounding gives 4630.02, so activating eTIMS sets the
+    site to Commercial Rounding, and KRA amounts are computed with Decimal, never `flt()`.
+  - `taxblAmt` = exact amount x 100/(100+r) and `taxAmt` = exact amount x r/(100+r), **each rounded
+    on its own** (3991.40 and 638.62); line `totAmt` = their sum (4630.02), which can be a cent
+    under `splyAmt`.
+  - A line total that doesn't divide into whole-cent unit prices (7 x 13.13 + VAT = 106.62) can't
+    be sent as one line, and a discount can't absorb the cent - KRA only honours whole-percent
+    `dcRt`. Such a line is split: 6 x 15.23 + 1 x 15.24. Fractional quantities that don't divide
+    are refused (price them VAT-inclusive).
+  - KRA checks a sale against its own stock balance ("Insufficient stock ... You only have 12").
 
 ---
 

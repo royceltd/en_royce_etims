@@ -144,6 +144,18 @@ def _validate_ready_to_sync(item, company):
 		)
 
 
+def fill_taxation_type(doc, method=None):
+	"""Item validate hook: an item with no eTIMS band takes the one on its Item
+	Tax Template, so the band isn't a second thing to keep in step with VAT."""
+	if doc.get("royce_etims_taxation_type"):
+		return
+	for row in doc.get("taxes") or []:
+		band = frappe.db.get_value("Item Tax Template", row.item_tax_template, "royce_etims_taxation_type")
+		if band:
+			doc.royce_etims_taxation_type = band
+			return
+
+
 def _mark_synced(item):
 	item.db_set("royce_etims_sync_status", "Synced", notify=False)
 	item.db_set("royce_etims_last_synced_on", now_datetime(), notify=False)

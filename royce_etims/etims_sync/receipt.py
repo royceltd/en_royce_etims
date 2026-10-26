@@ -30,21 +30,29 @@ customer_name, grand_total, ...) are identical between Sales Invoice and POS
 Invoice - confirmed against this bench's ERPNext - so one payload builder
 covers both.
 
-Tax-rate mapping is intentionally simple for v1: it trusts each Item's own
-eTIMS Taxation Type link as the single source of truth and does not try to
-reconcile against ERPNext's Sales Taxes and Charges table. Rates come from
-the `eTIMS Taxation Type` reference doctype (seeded from the one sample in
-the sandbox collection - see patches/v0_0/seed_etims_reference_data.py) so
-they're correctable by an admin without a code change, but they're still
-unverified against KRA's real selectCodeList response - a wrong rate here is
-a compliance bug, not a UI bug, so don't treat the seed as authoritative.
+VAT per line is what ERPNext posted, not worked out separately - see
+tax_lines.py. Rates come from the `eTIMS Taxation Type` reference doctype,
+synced from KRA's selectCodeList; a band KRA has disabled reports rate 0.
 """
+
+from decimal import Decimal
 
 import frappe
 from frappe import _
 from frappe.contacts.doctype.address.address import get_address_display
 from frappe.utils import flt, getdate, now_datetime
 
+from royce_etims.etims_sync.tax_lines import (
+	check_line,
+	check_total,
+	exact_amount,
+	kra_split,
+	line_amount,
+	money,
+	price_parts,
+	resolve_band,
+	vat_by_item_row,
+)
 from royce_etims.utils.api_client import request as etims_request
 from royce_etims.utils.config import PRODUCTION_QR_VERIFY_BASE_URL, SANDBOX_QR_VERIFY_BASE_URL
 from royce_etims.utils.id_mapping import get_etims_id
@@ -240,7 +248,7 @@ def retry_failed_receipts():
 
 @frappe.whitelist()
 def retry_receipt(doctype, name):
-	""""Retry eTIMS" on a Sales/POS Invoice: starts the retry budget over and
+	""" "Retry eTIMS" on a Sales/POS Invoice: starts the retry budget over and
 	queues the normal sync, so the branch lock and Sent re-check still apply."""
 	if doctype not in SIGN_SETTING_FIELD:
 		frappe.throw(_("eTIMS signing doesn't apply to {0}.").format(doctype))
@@ -325,8 +333,12 @@ def build_receipt_payload(doc, invc_no, settings):
 	tax = dict.fromkeys(TAX_CODES, 0.0)
 	posting_date = getdate(doc.posting_date)
 	rates = _get_tax_rates()
+	disabled_bands = set(frappe.get_all("eTIMS Taxation Type", filters={"disabled": 1}, pluck="code"))
+	line_vat = vat_by_item_row(doc)
+	total_gross = 0.0  # what ERPNext charges - checked against the invoice total
+	kra_total = 0.0  # KRA's sum of taxable + VAT, which can be a cent under it
 
-	for idx, d in enumerate(doc.items, start=1):
+	for d in doc.items:
 		item = frappe.get_cached_doc("Item", d.item_code)
 		if item.royce_prevent_etims_submission:
 			frappe.throw(
@@ -343,66 +355,69 @@ def build_receipt_payload(doc, invc_no, settings):
 				).format(d.item_code, doc.company)
 			)
 
-		code = item.royce_etims_taxation_type_code or "A"
+		# Everything below is the line as ERPNext posted it - see tax_lines.py.
+		# ERPNext stores a return with negative qty/amounts; KRA wants the same
+		# positive figures, with rcptTyCd "R" saying it's a credit note.
+		qty = abs(flt(d.qty))
+		net = abs(flt(d.base_net_amount))
+		vat = abs(flt(line_vat.get(d.name)))
+		code = resolve_band(d, item, net, vat, rates)
+		if code in disabled_bands and vat:
+			frappe.throw(
+				_(
+					"Row {0} ({1}) is charged VAT under eTIMS band {2}, which KRA currently has switched off."
+					" KRA will reject it until KRA enables the band."
+				).format(d.idx, d.item_code, code)
+			)
 		rate = rates.get(code, 0)
+		gross_amt = money(Decimal(str(net)) + Decimal(str(vat)))
+		line_tax = 0.0
+		# Usually one part; two when the line total doesn't divide into
+		# whole-cent unit prices - see tax_lines.price_parts.
+		for part_qty, prc in price_parts(gross_amt, qty, d):
+			part_gross = line_amount(part_qty, prc)
+			taxable_amt, tax_amt = kra_split(exact_amount(part_qty, prc), rate)
+			part_total = money(Decimal(str(taxable_amt)) + Decimal(str(tax_amt)))
+			taxbl[code] += taxable_amt
+			tax[code] += tax_amt
+			line_tax += tax_amt
+			items_payload.append(
+				{
+					"itemSeq": len(items_payload) + 1,
+					"itemCd": item_cd,
+					"itemClsCd": item.royce_etims_item_classification_code,
+					"itemNm": item.item_name,
+					"bcd": "",
+					"pkgUnitCd": item.royce_etims_packaging_unit_code,
+					"pkg": 1,
+					"qtyUnitCd": item.royce_etims_quantity_unit_code,
+					"qty": part_qty,
+					# VAT-inclusive and after any discount ERPNext applied, so
+					# there's no separate discount to report.
+					"prc": prc,
+					"splyAmt": part_gross,
+					"dcRt": 0,
+					"dcAmt": 0,
+					# Compulsory-insurance fields (motor vehicles etc.) - null in
+					# the confirmed sample payload too. Item has no insurance data
+					# to source these from yet; sent explicitly rather than
+					# omitted in case KRA's validator expects the keys present.
+					"isrccCd": None,
+					"isrccNm": None,
+					"isrcRt": None,
+					"isrcAmt": None,
+					"taxblAmt": taxable_amt,
+					"taxTyCd": code,
+					"taxAmt": tax_amt,
+					"totAmt": part_total,
+					"itemExprDt": None,
+				}
+			)
+			kra_total += part_total
+		check_line(d, code, rate, vat, flt(line_tax, 2))
+		total_gross += gross_amt
 
-		# KRA's OSCU expects tax-INCLUSIVE amounts - CONFIRMED 2026-09-23 by a
-		# real sendSalesTransaction rejection: a line sent as prc/totAmt 1000,
-		# taxblAmt 1000 (tax added on top: taxAmt 160) came back
-		# "Invalid taxblAmt on item: 1. Expected: 862.07, But Found: 1000.00"
-		# - 862.07 x 1.16 = 1000.00, i.e. the tax portion must be backed OUT
-		# of the line total, not added on top. Matches standard Kenyan retail
-		# VAT-inclusive pricing. gross_amt (the amount actually charged -
-		# same value used for prc/splyAmt/totAmt below) is now the basis;
-		# taxblAmt/taxAmt are derived from it, not the other way around.
-		#
-		# Still open: whether this ERPNext site's own Kenya VAT tax template
-		# is itself configured tax-inclusive (in which case d.base_amount
-		# already IS this gross, VAT-inclusive figure, and this fix is
-		# complete) or tax-exclusive (in which case d.base_amount is a
-		# pre-tax subtotal, and reconciling against ERPNext's own Sales Taxes
-		# and Charges table - deliberately NOT done here, see this module's
-		# top docstring - would be needed before this is correct for a real
-		# invoice). Confirm before relying on this for a real client invoice.
-		# ERPNext stores a return with negative qty/amounts; KRA wants the
-		# same positive figures with rcptTyCd "R" saying it's a credit note.
-		gross_amt = abs(flt(d.base_amount))
-		taxable_amt = flt(gross_amt / (1 + rate / 100), 2) if rate else gross_amt
-		tax_amt = flt(gross_amt - taxable_amt, 2)
-		taxbl[code] += taxable_amt
-		tax[code] += tax_amt
-
-		items_payload.append(
-			{
-				"itemSeq": idx,
-				"itemCd": item_cd,
-				"itemClsCd": item.royce_etims_item_classification_code,
-				"itemNm": item.item_name,
-				"bcd": "",
-				"pkgUnitCd": item.royce_etims_packaging_unit_code,
-				"pkg": 1,
-				"qtyUnitCd": item.royce_etims_quantity_unit_code,
-				"qty": abs(flt(d.qty)),
-				"prc": abs(flt(d.base_rate)),
-				"splyAmt": gross_amt,
-				"dcRt": d.discount_percentage or 0,
-				"dcAmt": abs(flt(d.discount_amount)),
-				# Compulsory-insurance fields (motor vehicles etc.) - null in
-				# the confirmed sample payload too. Item has no insurance data
-				# to source these from yet; sent explicitly rather than
-				# omitted in case KRA's validator expects the keys present.
-				"isrccCd": None,
-				"isrccNm": None,
-				"isrcRt": None,
-				"isrcAmt": None,
-				"taxblAmt": taxable_amt,
-				"taxTyCd": code,
-				"taxAmt": tax_amt,
-				"totAmt": gross_amt,
-				"itemExprDt": None,
-			}
-		)
-
+	check_total(doc, flt(total_gross, 2))
 	is_return = bool(doc.get("is_return"))
 	payload = {
 		"invcNo": invc_no,
@@ -427,7 +442,7 @@ def build_receipt_payload(doc, invc_no, settings):
 		**{f"taxAmt{c}": tax[c] for c in TAX_CODES},
 		"totTaxblAmt": sum(taxbl.values()),
 		"totTaxAmt": sum(tax.values()),
-		"totAmt": abs(flt(doc.grand_total)),
+		"totAmt": flt(kra_total, 2),
 		"prchrAcptcYn": "N",
 		"remark": None,
 		"regrId": doc.owner,

@@ -29,6 +29,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate
 
+from royce_etims.etims_sync.tax_lines import exact_amount, kra_split, line_amount
 from royce_etims.utils.api_client import request as etims_request
 from royce_etims.utils.id_mapping import get_etims_id
 from royce_etims.utils.sequence import lock_branch, send_in_sequence
@@ -102,13 +103,12 @@ def net_item_movements(sles):
 
 
 def vat_inclusive_amounts(rate, qty, tax_rate):
-	"""(total, taxable, tax) for a VAT-inclusive rate. KRA treats prc as
-	VAT-inclusive and recomputes taxblAmt from it - CONFIRMED 2026-10-26:
-	10 x 1000 at 16% -> "Invalid taxblAmt on item: 1. Expected: 8620.69,
-	But Found: 10000.00"."""
-	total = flt(rate * qty, 2)
-	taxable = flt(total / (1 + flt(tax_rate) / 100), 2)
-	return total, taxable, flt(total - taxable, 2)
+	"""(total, taxable, tax) for a VAT-inclusive rate, rounded exactly as KRA
+	recomputes them (tax_lines.kra_split) - KRA checks stockIO lines the same
+	way: 10 x 1000 at 16% -> "Invalid taxblAmt on item: 1. Expected: 8620.69,
+	But Found: 10000.00" (2026-10-26)."""
+	taxable, tax = kra_split(exact_amount(qty, rate), tax_rate)
+	return line_amount(qty, rate), taxable, tax
 
 
 def _item_row(item_code, qty, value, company):

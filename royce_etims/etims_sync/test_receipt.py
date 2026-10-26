@@ -18,6 +18,7 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from frappe.utils import flt
 
 from royce_etims.etims_sync.receipt import (
 	_apply_success,
@@ -192,6 +193,53 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 			item.insert(ignore_permissions=True)
 		return frappe.get_doc("Item", item.item_code)
 
+	def _invoice(self, item, net, vat, qty=1, **fields):
+		"""A one-line invoice as ERPNext would hold it after posting `vat` on `net`."""
+		row = frappe._dict(name="row1", idx=1, item_code=item.item_code, qty=qty, base_net_amount=net)
+		values = {
+			"doctype": "Sales Invoice",
+			"name": "SINV-TAX-TEST",
+			"company": TEST_COMPANY,
+			"tax_id": "A123456789Z",
+			"customer_name": "Test Customer",
+			"posting_date": "2026-09-23",
+			"owner": "Administrator",
+			"modified_by": "Administrator",
+			"base_grand_total": flt(net + vat, 2),
+			"contact_mobile": None,
+			"company_address": None,
+			"items": [row],
+			**fields,
+		}
+		return _FakeInvoiceDoc(**values)
+
+	def _payload(self, doc, vat_by_row):
+		with patch("royce_etims.etims_sync.receipt.vat_by_item_row", return_value=vat_by_row):
+			return build_receipt_payload(doc, 1, frappe.get_doc({"doctype": "eTIMS Settings"}))
+
+	def test_vat_on_top_invoice_sends_what_the_customer_pays(self):
+		"""The live rejection 2026-10-26: 1160 + 16% was sent as 1160 VAT-inclusive
+		("Invalid totAmt . Expected: 1160.00, But Found: 1345.6")."""
+		payload = self._payload(
+			self._invoice(self._make_payload_item(), net=1160, vat=185.6), {"row1": 185.6}
+		)
+		line = payload["itemList"][0]
+		self.assertEqual((line["prc"], line["splyAmt"], line["totAmt"]), (1345.6, 1345.6, 1345.6))
+		self.assertEqual((line["taxblAmt"], line["taxAmt"]), (1160, 185.6))
+		self.assertEqual((payload["totAmt"], payload["totTaxAmt"]), (1345.6, 185.6))
+
+	def test_band_b_line_with_no_vat_posted_is_refused(self):
+		"""ACC-SINV-2026-00006: no VAT row on the invoice, so the books had no VAT,
+		but the payload would have sent 160."""
+		with self.assertRaises(frappe.ValidationError):
+			self._payload(self._invoice(self._make_payload_item(), net=1160, vat=0), {})
+
+	def test_lines_not_adding_up_to_the_invoice_total_are_refused(self):
+		doc = self._invoice(self._make_payload_item(), net=1000, vat=160)
+		doc.base_grand_total = 1100  # e.g. an invoice-level charge or discount
+		with self.assertRaises(frappe.ValidationError):
+			self._payload(doc, {"row1": 160})
+
 	def test_build_receipt_payload_uses_tax_inclusive_amounts(self):
 		"""CONFIRMED 2026-09-23 by a real sendSalesTransaction rejection against
 		KRA's sandbox: a line sent with prc/totAmt 1000, taxblAmt 1000 (tax
@@ -201,31 +249,12 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 		total - the opposite of what this used to (wrongly) compute."""
 		item = self._make_payload_item()
 
-		item_row = frappe._dict(
-			item_code=item.item_code,
-			qty=1,
-			base_rate=1000,
-			base_amount=1000,
-			base_net_amount=1000,
-			discount_percentage=0,
-			discount_amount=0,
-		)
-		doc = _FakeInvoiceDoc(
-			name="SINV-TAX-TEST",
-			company=TEST_COMPANY,
-			tax_id="A123456789Z",
-			customer_name="Test Customer",
-			posting_date="2026-09-23",
-			owner="Administrator",
-			modified_by="Administrator",
-			grand_total=1000,
-			contact_mobile=None,
-			company_address=None,
-			items=[item_row],
-		)
+		# VAT-inclusive template: 1000 charged, ERPNext posts net 862.07 + 137.93 VAT.
+		doc = self._invoice(item, net=862.07, vat=137.93)
 		settings = frappe.get_doc({"doctype": "eTIMS Settings"})
 
-		payload = build_receipt_payload(doc, 1, settings)
+		with patch("royce_etims.etims_sync.receipt.vat_by_item_row", return_value={"row1": 137.93}):
+			payload = build_receipt_payload(doc, 1, settings)
 
 		line = payload["itemList"][0]
 		self.assertAlmostEqual(line["taxblAmt"], 862.07, places=2)
@@ -251,35 +280,23 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 		"""An ERPNext return (negative qty/amounts) goes to KRA as rcptTyCd "R"
 		with positive figures, the original's invcNo, and a refund reason."""
 		item = self._make_payload_item()
-		item_row = frappe._dict(
-			item_code=item.item_code,
+		doc = self._invoice(
+			item,
+			net=-862.07,
+			vat=-137.93,
 			qty=-1,
-			base_rate=1000,
-			base_amount=-1000,
-			base_net_amount=-1000,
-			discount_percentage=0,
-			discount_amount=0,
-		)
-		doc = _FakeInvoiceDoc(
-			doctype="Sales Invoice",
 			name="SINV-RET-TEST",
-			company=TEST_COMPANY,
-			tax_id="A123456789Z",
-			customer_name="Test Customer",
 			posting_date="2026-10-26",
-			owner="Administrator",
-			modified_by="Administrator",
-			grand_total=-1000,
-			contact_mobile=None,
-			company_address=None,
 			is_return=1,
 			return_against="SINV-ORIG-TEST",
 			royce_etims_refund_reason="03",
-			items=[item_row],
 		)
 		settings = frappe.get_doc({"doctype": "eTIMS Settings"})
 
-		with patch("royce_etims.etims_sync.receipt._original_invoice_number", return_value=11):
+		with (
+			patch("royce_etims.etims_sync.receipt._original_invoice_number", return_value=11),
+			patch("royce_etims.etims_sync.receipt.vat_by_item_row", return_value={"row1": -137.93}),
+		):
 			payload = build_receipt_payload(doc, 12, settings)
 
 		self.assertEqual(payload["rcptTyCd"], "R")

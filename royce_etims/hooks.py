@@ -175,6 +175,12 @@ doc_events = {
 	"Customer": {
 		"on_update": "royce_etims.etims_sync.customer.on_update",
 	},
+	"Item Tax Template": {
+		"validate": "royce_etims.etims_sync.tax_lines.set_default_band",
+	},
+	"Item": {
+		"validate": "royce_etims.etims_sync.item.fill_taxation_type",
+	},
 	"Purchase Receipt": _STOCK_EVENTS,
 	"Purchase Invoice": _STOCK_EVENTS,
 	"Delivery Note": _STOCK_EVENTS,
