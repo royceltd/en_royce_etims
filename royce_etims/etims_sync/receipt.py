@@ -99,6 +99,9 @@ def on_submit(doc, method=None):
 			).format(doc.company)
 		)
 
+	if doc.get("is_return") and not doc.get("royce_etims_refund_reason"):
+		frappe.throw(_("Select an eTIMS Refund Reason - KRA requires one on every credit note."))
+
 	doc.db_set("royce_etims_branch", branch_name, notify=False)
 	doc.db_set("royce_etims_status", "Pending", notify=False)
 
@@ -267,6 +270,25 @@ def _build_receipt_block(doc, settings):
 	}
 
 
+def _original_invoice_number(doc):
+	"""KRA invcNo of the invoice a credit note returns against. The original
+	must be signed first - until it is, this raises and the credit note stays
+	Failed for the retry sweep to pick up once it has a number."""
+	if not doc.get("return_against"):
+		frappe.throw(_("Credit note {0} has no Return Against invoice to reference.").format(doc.name))
+
+	status, number = frappe.db.get_value(
+		doc.doctype, doc.return_against, ["royce_etims_status", "royce_etims_invoice_number"]
+	) or (None, None)
+	if status != "Sent" or not number:
+		frappe.throw(
+			_(
+				"Original invoice {0} isn't signed by eTIMS yet, so this credit note can't reference it."
+			).format(doc.return_against)
+		)
+	return number
+
+
 def build_receipt_payload(doc, invc_no, settings):
 	validate_kra_pin(doc.tax_id, label=_("Customer TIN"))
 
@@ -314,7 +336,9 @@ def build_receipt_payload(doc, invc_no, settings):
 		# and Charges table - deliberately NOT done here, see this module's
 		# top docstring - would be needed before this is correct for a real
 		# invoice). Confirm before relying on this for a real client invoice.
-		gross_amt = flt(d.base_amount)
+		# ERPNext stores a return with negative qty/amounts; KRA wants the
+		# same positive figures with rcptTyCd "R" saying it's a credit note.
+		gross_amt = abs(flt(d.base_amount))
 		taxable_amt = flt(gross_amt / (1 + rate / 100), 2) if rate else gross_amt
 		tax_amt = flt(gross_amt - taxable_amt, 2)
 		taxbl[code] += taxable_amt
@@ -330,11 +354,11 @@ def build_receipt_payload(doc, invc_no, settings):
 				"pkgUnitCd": item.royce_etims_packaging_unit_code,
 				"pkg": 1,
 				"qtyUnitCd": item.royce_etims_quantity_unit_code,
-				"qty": d.qty,
-				"prc": d.base_rate,
-				"splyAmt": d.base_amount,
+				"qty": abs(flt(d.qty)),
+				"prc": abs(flt(d.base_rate)),
+				"splyAmt": gross_amt,
 				"dcRt": d.discount_percentage or 0,
-				"dcAmt": d.discount_amount or 0,
+				"dcAmt": abs(flt(d.discount_amount)),
 				# Compulsory-insurance fields (motor vehicles etc.) - null in
 				# the confirmed sample payload too. Item has no insurance data
 				# to source these from yet; sent explicitly rather than
@@ -351,13 +375,14 @@ def build_receipt_payload(doc, invc_no, settings):
 			}
 		)
 
+	is_return = bool(doc.get("is_return"))
 	payload = {
 		"invcNo": invc_no,
-		"orgInvcNo": 0,  # credit-note/orig-invoice linkage not handled yet - see docs/architecture.md open items
+		"orgInvcNo": _original_invoice_number(doc) if is_return else 0,
 		"custTin": doc.tax_id or None,
 		"custNm": doc.customer_name,
 		"salesTyCd": "N",
-		"rcptTyCd": "S",
+		"rcptTyCd": "R" if is_return else "S",
 		"pmtTyCd": "01",
 		"salesSttsCd": "02",
 		"cfmDt": posting_date.strftime("%Y%m%d") + "000000",
@@ -365,15 +390,15 @@ def build_receipt_payload(doc, invc_no, settings):
 		"stockRlsDt": None,
 		"cnclReqDt": None,
 		"cnclDt": None,
-		"rfdDt": None,
-		"rfdRsnCd": None,
+		"rfdDt": posting_date.strftime("%Y%m%d") + "000000" if is_return else None,
+		"rfdRsnCd": doc.get("royce_etims_refund_reason") if is_return else None,
 		"totItemCnt": len(items_payload),
 		**{f"taxblAmt{c}": taxbl[c] for c in TAX_CODES},
 		**{f"taxRt{c}": rates[c] for c in TAX_CODES},
 		**{f"taxAmt{c}": tax[c] for c in TAX_CODES},
 		"totTaxblAmt": sum(taxbl.values()),
 		"totTaxAmt": sum(tax.values()),
-		"totAmt": doc.grand_total,
+		"totAmt": abs(flt(doc.grand_total)),
 		"prchrAcptcYn": "N",
 		"remark": None,
 		"regrId": doc.owner,

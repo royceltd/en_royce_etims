@@ -45,6 +45,15 @@ def _receipt_fields(insert_after):
 			"description": "Registered device this document is submitted through. Defaults to the company's Default Branch if left blank.",
 		},
 		{
+			"fieldname": "royce_etims_refund_reason",
+			"fieldtype": "Link",
+			"options": "eTIMS Refund Reason",
+			"label": "eTIMS Refund Reason",
+			"insert_after": "royce_etims_branch",
+			"depends_on": "eval:doc.is_return",
+			"description": "Required by KRA on a credit note (rfdRsnCd). Only enforced when eTIMS signs this document.",
+		},
+		{
 			"fieldname": "royce_etims_status",
 			"fieldtype": "Select",
 			"label": "eTIMS Status",
@@ -52,7 +61,7 @@ def _receipt_fields(insert_after):
 			"default": "Not Applicable",
 			"read_only": 1,
 			"in_list_view": 1,
-			"insert_after": "royce_etims_branch",
+			"insert_after": "royce_etims_refund_reason",
 		},
 		{
 			"fieldname": "royce_etims_column_break",

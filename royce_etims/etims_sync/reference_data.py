@@ -35,6 +35,7 @@ CODE_CLASS_DOCTYPE = {
 	"10": "eTIMS Quantity Unit",
 	"17": "eTIMS Packaging Unit",
 	"24": "eTIMS Item Type",
+	"32": "eTIMS Refund Reason",
 }
 
 # Full pull every time: these lists are small (a few hundred rows) and an

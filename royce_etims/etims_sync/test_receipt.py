@@ -14,10 +14,17 @@ Sales Invoice (customer, stock, tax templates, ...) is expensive scaffolding
 that buys nothing for what these specific fixes need covered.
 """
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from royce_etims.etims_sync.receipt import _apply_success, _build_receipt_block, build_receipt_payload
+from royce_etims.etims_sync.receipt import (
+	_apply_success,
+	_build_receipt_block,
+	_original_invoice_number,
+	build_receipt_payload,
+)
 from royce_etims.setup.utils import TEST_COMPANY
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
@@ -143,19 +150,13 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 		self.assertEqual(doc.royce_etims_control_unit_datetime, "20260910120000")
 		self.assertIn("SIGN123", doc.royce_etims_qr_verification_url)
 
-	def test_build_receipt_payload_uses_tax_inclusive_amounts(self):
-		"""CONFIRMED 2026-09-23 by a real sendSalesTransaction rejection against
-		KRA's sandbox: a line sent with prc/totAmt 1000, taxblAmt 1000 (tax
-		added on top, taxAmt 160) was rejected - "Invalid taxblAmt on item: 1.
-		Expected: 862.07, But Found: 1000.00". 862.07 x 1.16 = 1000.00: KRA
-		expects tax-INCLUSIVE amounts, with taxblAmt/taxAmt backed OUT of the
-		total - the opposite of what this used to (wrongly) compute."""
+	def _make_payload_item(self):
 		# The eTIMS ID Mapping row below Link-validates against a real eTIMS
 		# Settings doc (TEST_COMPANY has none by default - see the
 		# before_tests note above). Create one directly rather than
 		# ignore_links=True on the Item insert - that would also suppress
 		# royce_etims_taxation_type's fetch_from resolution, silently defaulting
-		# the tax code to "A" and defeating the point of this test (caught
+		# the tax code to "A" and defeating the point of the payload tests (caught
 		# live while writing it: taxTyCd came back "A", not "B").
 		if not frappe.db.exists("eTIMS Settings", TEST_COMPANY):
 			frappe.get_doc(
@@ -185,7 +186,18 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 				],
 			}
 		)
-		item.insert(ignore_permissions=True)
+		if not frappe.db.exists("Item", item.item_code):
+			item.insert(ignore_permissions=True)
+		return frappe.get_doc("Item", item.item_code)
+
+	def test_build_receipt_payload_uses_tax_inclusive_amounts(self):
+		"""CONFIRMED 2026-09-23 by a real sendSalesTransaction rejection against
+		KRA's sandbox: a line sent with prc/totAmt 1000, taxblAmt 1000 (tax
+		added on top, taxAmt 160) was rejected - "Invalid taxblAmt on item: 1.
+		Expected: 862.07, But Found: 1000.00". 862.07 x 1.16 = 1000.00: KRA
+		expects tax-INCLUSIVE amounts, with taxblAmt/taxAmt backed OUT of the
+		total - the opposite of what this used to (wrongly) compute."""
+		item = self._make_payload_item()
 
 		item_row = frappe._dict(
 			item_code=item.item_code,
@@ -232,3 +244,56 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 		_apply_success(doc, 2, data, settings, branch)
 
 		self.assertEqual(doc.royce_etims_receipt_signature, "SIGN456")
+
+	def test_credit_note_payload(self):
+		"""An ERPNext return (negative qty/amounts) goes to KRA as rcptTyCd "R"
+		with positive figures, the original's invcNo, and a refund reason."""
+		item = self._make_payload_item()
+		item_row = frappe._dict(
+			item_code=item.item_code,
+			qty=-1,
+			base_rate=1000,
+			base_amount=-1000,
+			base_net_amount=-1000,
+			discount_percentage=0,
+			discount_amount=0,
+		)
+		doc = _FakeInvoiceDoc(
+			doctype="Sales Invoice",
+			name="SINV-RET-TEST",
+			company=TEST_COMPANY,
+			tax_id="A123456789Z",
+			customer_name="Test Customer",
+			posting_date="2026-10-26",
+			owner="Administrator",
+			modified_by="Administrator",
+			grand_total=-1000,
+			contact_mobile=None,
+			company_address=None,
+			is_return=1,
+			return_against="SINV-ORIG-TEST",
+			royce_etims_refund_reason="03",
+			items=[item_row],
+		)
+		settings = frappe.get_doc({"doctype": "eTIMS Settings"})
+
+		with patch("royce_etims.etims_sync.receipt._original_invoice_number", return_value=11):
+			payload = build_receipt_payload(doc, 12, settings)
+
+		self.assertEqual(payload["rcptTyCd"], "R")
+		self.assertEqual(payload["orgInvcNo"], 11)
+		self.assertEqual(payload["rfdRsnCd"], "03")
+		self.assertEqual(payload["rfdDt"], "20261026000000")
+		self.assertEqual(payload["totAmt"], 1000)
+		line = payload["itemList"][0]
+		self.assertEqual((line["qty"], line["prc"], line["totAmt"]), (1, 1000, 1000))
+		self.assertAlmostEqual(line["taxblAmt"], 862.07, places=2)
+		self.assertAlmostEqual(payload["taxAmtB"], 137.93, places=2)
+
+	def test_credit_note_needs_signed_original(self):
+		doc = frappe._dict(doctype="Sales Invoice", name="SINV-RET-TEST", return_against="SINV-ORIG-TEST")
+		with patch("frappe.db.get_value", return_value=("Failed", None)):
+			with self.assertRaises(frappe.ValidationError):
+				_original_invoice_number(doc)
+		with patch("frappe.db.get_value", return_value=("Sent", 11)):
+			self.assertEqual(_original_invoice_number(doc), 11)

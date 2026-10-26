@@ -11,3 +11,4 @@ royce_etims.patches.v0_0.seed_sample_item_reference_data
 royce_etims.patches.v0_0.add_etims_reference_fields_to_item
 royce_etims.patches.v0_0.fix_apps_screen_logo
 royce_etims.patches.v0_0.fix_api_surface_correction
+royce_etims.patches.v0_0.add_etims_refund_reason_field

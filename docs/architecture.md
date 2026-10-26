@@ -688,6 +688,15 @@ just a config change.
   call, and when KRA names the number it expected ("Invalid sarNo: Expected: 7 but found: 8620")
   the counter resyncs and resends once. Shared by invcNo and sarNo. The parser only trusts
   messages naming invcNo/sarNo - KRA uses the same "Expected:" wording for amounts.
+- **Credit notes (2026-10-26).** A Sales/POS Invoice return is sent as `rcptTyCd "R"` with positive
+  qty/amounts (ERPNext stores them negative), `orgInvcNo` = the original's KRA invcNo, `rfdDt`,
+  and `rfdRsnCd` from a new `eTIMS Refund Reason` list (KRA code class 32, synced like the
+  others). The refund reason is required only when eTIMS signs the document; a credit note whose
+  original isn't signed yet fails clearly and is retried. Built and unit-tested against the
+  payload rules KRA confirmed for invoices; **not yet signed live**, since no invoice can be signed
+  until KRA fixes branch 02's invcNo counter. Return stock is confirmed live (sarNo 11, type 03).
+  The seven reference lists are now readable by every Desk User (they were System Manager only,
+  so a cashier couldn't pick a refund reason, nor an Item Manager a classification).
 
 ---
 
