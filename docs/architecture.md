@@ -745,6 +745,21 @@ just a config change.
     **Open with KRA:** for KE2NTBA0000005 every stockIO (sarNo 7-12) and every save/stockMaster
     was accepted, the last rsdQty being 9 - matching ERPNext - yet the sale check reported 12.
     KRA's sale-time stock check apparently counts differently from its own stock master.
+- **First signed invoice, 2026-10-27, on branch 00 of the Go-Live test PIN.** "Use branch 00" turned
+  out to mean the Application Test Pin from the Go-Live Validation screen (`P600004665A`), not our
+  own TIN: `/initialize` with tin P600004665A, bhfId 00, dvcSrlNo 5CD6472Z8WR succeeded (dvcId
+  451417, same SCU KRACU0400001224), while bhfId 00 and 01 on P051909825V stay "901 not a valid
+  device". On this PIN the invcNo counter isn't stuck: `ACC-SINV-2026-00009` (company "KRA Go-Live
+  Test" on etims.localhost) was signed end to end through the app as KRA invoice 4, QR and CU block
+  printed. Notes:
+  - The certification harness enforces call order: `insert/stockIO` is refused with "Make 'Get Item
+    Classification List' request before performing StockIo" until `selectItemClass` has been called.
+    The reference-data sync (Settings > Sync KRA Reference Data) covers it.
+  - `sendSalesTransaction`'s signature fields sit directly under `responseBody.data` (`curRcptNo`,
+    `totRcptNo`, `intrlData`, `rcptSign`, `sdcDateTime`) - confirmed, no `info` wrapper.
+  - **Bug found and fixed:** a successful signing wasn't committed until the job ended, so any later
+    error rolled it back and the retry signed the invoice again. 00009 exists at KRA as invoices 2
+    and 3 (lost) and 4 (recorded) on the test PIN. Success is now committed the moment KRA accepts.
 
 ---
 

@@ -146,14 +146,24 @@ def _validate_ready_to_sync(item, company):
 
 def fill_taxation_type(doc, method=None):
 	"""Item validate hook: an item with no eTIMS band takes the one on its Item
-	Tax Template, so the band isn't a second thing to keep in step with VAT."""
-	if doc.get("royce_etims_taxation_type"):
-		return
-	for row in doc.get("taxes") or []:
-		band = frappe.db.get_value("Item Tax Template", row.item_tax_template, "royce_etims_taxation_type")
-		if band:
-			doc.royce_etims_taxation_type = band
-			return
+	Tax Template, so the band isn't a second thing to keep in step with VAT.
+
+	Also fills the band's code and rate: this runs after Frappe has copied
+	fetch_from values, so a band set here would otherwise leave
+	royce_etims_taxation_type_code empty - and saveItem sends that code, which
+	KRA rejects as "taxTyCd cannot be null" (found live 2026-10-27)."""
+	band = doc.get("royce_etims_taxation_type")
+	if not band:
+		for row in doc.get("taxes") or []:
+			band = frappe.db.get_value(
+				"Item Tax Template", row.item_tax_template, "royce_etims_taxation_type"
+			)
+			if band:
+				doc.royce_etims_taxation_type = band
+				break
+	if band and doc.get("royce_etims_taxation_type_code") != band:
+		doc.royce_etims_taxation_type_code = band  # eTIMS Taxation Type is named by its code
+		doc.royce_etims_taxation_type_rate = frappe.db.get_value("eTIMS Taxation Type", band, "rate")
 
 
 def _mark_synced(item):

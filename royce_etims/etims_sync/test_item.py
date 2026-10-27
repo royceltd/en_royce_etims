@@ -149,3 +149,29 @@ class IntegrationTestItemSync(IntegrationTestCase):
 		payload = build_item_payload(item, "KE2NTBA00090001")
 
 		self.assertEqual(payload["useYn"], "N")
+
+	def test_band_code_follows_template_band(self):
+		"""Live 2026-10-27: an item whose band came from its tax template was
+		sent with taxTyCd null - the hook set the band after fetch_from ran."""
+		from unittest.mock import patch
+
+		from royce_etims.etims_sync.item import fill_taxation_type
+
+		item = frappe._dict(
+			royce_etims_taxation_type=None,
+			royce_etims_taxation_type_code=None,
+			taxes=[frappe._dict(item_tax_template="KE Standard 16% - X")],
+		)
+		with patch(
+			"frappe.db.get_value",
+			side_effect=lambda doctype, name, field: "B" if doctype == "Item Tax Template" else 16,
+		):
+			fill_taxation_type(item)
+		self.assertEqual(
+			(
+				item.royce_etims_taxation_type,
+				item.royce_etims_taxation_type_code,
+				item.royce_etims_taxation_type_rate,
+			),
+			("B", "B", 16),
+		)

@@ -180,7 +180,15 @@ def sync_receipt(doctype, name):
 		frappe.db.commit()
 		return
 
+	# KRA has signed it and spent invc_no: record that before anything else can
+	# fail (QR generation, a dropped connection, the worker dying). Left to the
+	# job's final commit, a later error rolled it back and the retry signed the
+	# same invoice again - FOUND 2026-10-27: ACC-SINV-2026-00009 became KRA
+	# invoices 2 and 3 on the Go-Live test PIN.
+	doc.db_set({"royce_etims_status": "Sent", "royce_etims_invoice_number": invc_no}, notify=False)
+	frappe.db.commit()  # nosemgrep
 	_apply_success(doc, invc_no, data, settings, branch)
+	frappe.db.commit()  # nosemgrep
 
 
 def _apply_success(doc, invc_no, data, settings, branch):
