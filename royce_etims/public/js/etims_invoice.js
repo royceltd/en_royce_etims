@@ -4,6 +4,15 @@
 // Shared by Sales Invoice and POS Invoice (hooks.py doctype_js).
 const royce_etims_invoice = {
 	refresh(frm) {
+		if (frm.doc.docstatus === 1 && frm.doc.royce_etims_status === "Sent") {
+			frm.add_custom_button(__("View at KRA"), () => {
+				frappe.set_route("query-report", "KRA Lookup", {
+					company: frm.doc.company,
+					lookup: "Invoice Details",
+					invoice_no: frm.doc.royce_etims_invoice_number,
+				});
+			});
+		}
 		if (frm.doc.docstatus !== 1 || !["Pending", "Failed"].includes(frm.doc.royce_etims_status))
 			return;
 

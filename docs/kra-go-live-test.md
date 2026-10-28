@@ -212,3 +212,18 @@ read-only; the six code fields are hidden (the dropdowns show them); category, t
 packaging and unit lock once registered. New items fill empty fields: Kenya, Finished Product
 (stock) / Service (non-stock), Net packaging, quantity unit from the UOM's new *KRA Quantity
 Unit*, category from the Item Group's new *KRA Product Category* (nearest parent group).
+
+## Lookups built (2026-10-29)
+
+**KRA eTIMS → KRA Lookup** (Script Report; System Manager, Accounts Manager) runs any of KRA's
+read-only lookups for a company's default branch and links each row to Royce ERP where it can:
+Branches (`branchList` → eTIMS Branch), Notices (`selectNoticeList`), Customers
+(`customerPinInfo` → Customer by PIN), Items (`itemInfo` → Item by KRA code), Imported Items
+(`importedItemInfo`), Stock Received from Others (`selectStockMoveLists`), Sales
+(`selectSalesTransactions` → Sales/POS Invoice), Invoice Details (`selectInvoiceDetail`, one row
+per line → the invoice) and Purchases (`getPurchaseTransactionInfo` → Supplier by PIN). Signed
+invoices get a **View at KRA** button that opens Invoice Details. KRA's "There is no search
+result" (resultCd 001) is an empty table, opted into per call (`allow_empty`).
+All nine run live on the test PIN. Go-Live cases 4, 5, 9, 12, 15, 18, 20, 21, 22 are now covered
+by this report; still to build: 7, 8 (branch users, insurers), 11 (composition), 13 (imported item
+update), 16 (purchases, pending).

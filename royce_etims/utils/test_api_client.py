@@ -50,6 +50,17 @@ class IntegrationTestApiClientResponseParsing(IntegrationTestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "There is no search result"):
 			_parse_response(data, response, "selectCodeList")
 
+	def test_no_search_result_is_empty_when_the_caller_allows_it(self):
+		"""Lookups opt in per call (allow_empty) - the decision the test above
+		leaves to the caller."""
+		data = {"responseBody": {"resultCd": "001", "resultMsg": "There is no search result"}}
+		response = _FakeResponse(ok=False, status_code=400)
+		self.assertIs(_parse_response(data, response, "selectNoticeList", allow_empty=True), data)
+
+		data["responseBody"]["resultCd"] = "999"
+		with self.assertRaises(frappe.ValidationError):
+			_parse_response(data, response, "selectNoticeList", allow_empty=True)
+
 	def test_business_result_code_failure_still_raises(self):
 		"""A real business rejection (resultCd != "000"/absent-success) should
 		still raise, regardless of HTTP status - resultCd is authoritative,

@@ -165,6 +165,7 @@ def request(
 	branch=None,
 	reference_doctype=None,
 	reference_name=None,
+	allow_empty=False,
 ):
 	"""Call an eTIMS business endpoint with standard headers, and log it.
 
@@ -225,10 +226,14 @@ def request(
 	except ValueError:
 		data = {}
 
-	return _parse_response(data, response, endpoint)
+	return _parse_response(data, response, endpoint, allow_empty)
 
 
-def _parse_response(data, response, endpoint):
+# "There is no search result" - an empty list, not a failure, for a lookup.
+NO_SEARCH_RESULT = "001"
+
+
+def _parse_response(data, response, endpoint, allow_empty=False):
 	"""Decide success/failure and return the parsed body, or raise.
 
 	HTTP status alone is NOT a reliable success/failure signal - CONFIRMED
@@ -253,6 +258,8 @@ def _parse_response(data, response, endpoint):
 	result_cd = body.get("resultCd") if isinstance(body, dict) else None
 
 	if result_cd is not None:
+		if result_cd == NO_SEARCH_RESULT and allow_empty:
+			return data
 		if result_cd != "000":
 			frappe.throw(
 				_("eTIMS rejected the request to {0}: {1}").format(
