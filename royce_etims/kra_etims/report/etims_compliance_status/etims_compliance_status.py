@@ -109,16 +109,39 @@ def _stock_rows(company):
 
 
 def _item_rows(company):
-	"""Items whose last sync failed. Items are shared across companies and
-	their sync status isn't per company, so this isn't filtered by company."""
+	"""Items that can't be sold on a signed invoice for this company: active
+	sales items with no KRA item code under it. Not registered at all, or
+	failed - KRA's or our own checks; the reason is on the item."""
+	registered = set(
+		frappe.get_all(
+			"eTIMS ID Mapping",
+			filters={
+				"parenttype": "Item",
+				"setup_doctype": "eTIMS Settings",
+				"setup_docname": company,
+				"disabled": 0,
+			},
+			pluck="parent",
+		)
+	)
 	rows = []
 	for item in frappe.get_all(
 		"Item",
-		filters={"royce_etims_sync_status": "Failed", "disabled": 0},
-		fields=["name", "modified", "royce_etims_sync_error"],
+		filters={"disabled": 0, "is_sales_item": 1, "royce_prevent_etims_submission": 0},
+		fields=["name", "modified", "royce_etims_sync_status", "royce_etims_sync_error"],
 	):
+		if item.name in registered:
+			continue
+		failed = item.royce_etims_sync_status == "Failed"
 		rows.append(
-			_row(_("Item"), "Item", item.name, item.modified.date(), _("Failed"), item.royce_etims_sync_error)
+			_row(
+				_("Item"),
+				"Item",
+				item.name,
+				item.modified.date(),
+				_("Failed") if failed else _("Not Registered"),
+				item.royce_etims_sync_error if failed else _("Open the item and click Sync to eTIMS."),
+			)
 		)
 	return rows
 

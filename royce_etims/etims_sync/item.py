@@ -246,6 +246,16 @@ def fill_taxation_type(doc, method=None):
 		doc.royce_etims_taxation_type_rate = frappe.db.get_value("eTIMS Taxation Type", band, "rate")
 
 
+def _mark_failed(item, error):
+	item.db_set(
+		{"royce_etims_sync_status": "Failed", "royce_etims_sync_error": frappe.utils.strip_html(str(error))},
+		notify=False,
+	)
+	# Keep the Failed status (and any eTIMS Log row) through the rollback the
+	# caller's re-raise triggers.
+	frappe.db.commit()  # nosemgrep
+
+
 def _mark_synced(item):
 	item.db_set("royce_etims_sync_status", "Synced", notify=False)
 	item.db_set("royce_etims_last_synced_on", now_datetime(), notify=False)
@@ -264,7 +274,12 @@ def sync_item(item_code, company):
 			).format(company)
 		)
 
-	_validate_ready_to_sync(item, company)
+	try:
+		_validate_ready_to_sync(item, company)
+	except frappe.ValidationError as e:
+		# Stopped before reaching KRA - still Failed, so Compliance Status shows it.
+		_mark_failed(item, e)
+		raise
 	branch = frappe.get_doc("eTIMS Branch", settings.default_branch)
 	item_cd = get_etims_id(item, company)
 	is_new_code = not item_cd
@@ -297,11 +312,7 @@ def sync_item(item_code, company):
 			reference_name=item.name,
 		)
 	except Exception as e:
-		item.db_set("royce_etims_sync_status", "Failed", notify=False)
-		item.db_set("royce_etims_sync_error", str(e)[:140], notify=False)
-		# Keep the Failed status (and the eTIMS Log row) through the rollback
-		# the re-raise triggers.
-		frappe.db.commit()  # nosemgrep
+		_mark_failed(item, e)
 		raise
 
 	# Recorded only once KRA has accepted it, so a rejected attempt never

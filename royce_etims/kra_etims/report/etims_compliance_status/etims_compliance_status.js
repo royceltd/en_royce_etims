@@ -15,7 +15,7 @@ frappe.query_reports["eTIMS Compliance Status"] = {
 	formatter(value, row, column, data, default_formatter) {
 		value = default_formatter(value, row, column, data);
 		if (column.fieldname === "status" && data) {
-			const color = data.status === "Pending" ? "orange" : "red";
+			const color = ["Pending", "Not Registered"].includes(data.status) ? "orange" : "red";
 			value = `<span class="indicator-pill ${color}">${value}</span>`;
 		}
 		return value;
