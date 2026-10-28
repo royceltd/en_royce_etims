@@ -227,3 +227,16 @@ result" (resultCd 001) is an empty table, opted into per call (`allow_empty`).
 All nine run live on the test PIN. Go-Live cases 4, 5, 9, 12, 15, 18, 20, 21, 22 are now covered
 by this report; still to build: 7, 8 (branch users, insurers), 11 (composition), 13 (imported item
 update), 16 (purchases, pending).
+
+## Point of Sale (2026-10-29)
+
+ERPNext v16's POS saves sales as Sales Invoices (`is_pos`); signing works the same way (golive
+ACC-SINV-2026-00006 → KRA invoice 10, 8 s after payment). Three gaps found and closed:
+- **Receipt had no KRA section**: a profile without a print format prints ERPNext's "POS Invoice".
+  Kenyan Accountant now ships **Kenya POS Receipt** (80 mm, CU details + QR, "KRA signature
+  pending" while unsigned, nothing without eTIMS) as the POS Profile default.
+- **Receipt printed before KRA signed**: the POS page script (`public/js/point_of_sale.js`) shows
+  the KRA status on the order summary and waits up to 15 s for the signature before printing;
+  after that it prints with the pending notice and says so.
+- **A POS Profile without a VAT template** charged no VAT, so every sale failed to sign; it now
+  can't be saved for a company eTIMS signs for. The cashier is alerted when KRA doesn't sign.

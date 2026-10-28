@@ -28,7 +28,9 @@ from royce_etims.etims_sync.receipt import (
 	before_cancel,
 	build_receipt_payload,
 	retry_receipt,
+	signing_status,
 	sync_receipt,
+	validate_pos_profile,
 )
 from royce_etims.setup.utils import TEST_COMPANY
 
@@ -414,3 +416,38 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 		):
 			sync_receipt("Sales Invoice", "SINV-CANCELLED")
 		send.assert_not_called()
+
+	def test_pos_profile_needs_a_vat_template_when_etims_signs(self):
+		profile = frappe._dict(company=TEST_COMPANY, taxes_and_charges=None, disabled=0)
+		with patch("royce_etims.etims_sync.receipt.signs", return_value=True):
+			with self.assertRaises(frappe.ValidationError):
+				validate_pos_profile(profile)
+			validate_pos_profile(
+				frappe._dict(profile, taxes_and_charges="KE - Standard VAT 16% Inclusive - Sales")
+			)
+		with patch("royce_etims.etims_sync.receipt.signs", return_value=False):
+			validate_pos_profile(profile)
+
+	def test_signing_status_for_the_till(self):
+		doc = _FakeDoc(
+			doctype="Sales Invoice",
+			company=TEST_COMPANY,
+			docstatus=1,
+			royce_etims_status="Failed",
+			royce_etims_invoice_number=0,
+			royce_etims_error="VAT doesn't match",
+		)
+		doc.check_permission = lambda ptype: None
+		with (
+			patch("frappe.get_doc", return_value=doc),
+			patch("royce_etims.etims_sync.receipt.signs", return_value=True),
+		):
+			self.assertEqual(
+				signing_status("Sales Invoice", "X"),
+				{"applies": True, "status": "Failed", "invoice_number": 0, "error": "VAT doesn't match"},
+			)
+		with (
+			patch("frappe.get_doc", return_value=doc),
+			patch("royce_etims.etims_sync.receipt.signs", return_value=False),
+		):
+			self.assertEqual(signing_status("Sales Invoice", "X"), {"applies": False})

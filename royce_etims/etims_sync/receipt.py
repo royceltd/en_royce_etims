@@ -298,6 +298,48 @@ def retry_receipt(doctype, name):
 	return _("Queued {0} for eTIMS signing.").format(name)
 
 
+def signs(company, doctype):
+	"""Whether eTIMS signs `doctype` for `company` - Active, and that doctype's
+	signing switch on."""
+	sign_field = SIGN_SETTING_FIELD.get(doctype)
+	if not sign_field or not frappe.db.exists("eTIMS Settings", company):
+		return False
+	settings = frappe.get_cached_doc("eTIMS Settings", company)
+	return settings.status == "Active" and bool(settings.get(sign_field))
+
+
+def validate_pos_profile(doc, method=None):
+	"""POS Profile validate hook. A till with no VAT template charges no VAT,
+	and every sale it makes is refused for signing (found 2026-10-29, POS
+	Profile "test" on golive.localhost) - so it isn't allowed for a company
+	eTIMS signs for."""
+	if doc.get("disabled") or doc.get("taxes_and_charges"):
+		return
+	if any(signs(doc.company, doctype) for doctype in SIGN_SETTING_FIELD):
+		frappe.throw(
+			_(
+				"Set a Sales Taxes and Charges Template on this POS Profile: {0} signs its sales with KRA eTIMS, and KRA refuses a sale without its VAT."
+			).format(doc.company),
+			title=_("VAT template required"),
+		)
+
+
+@frappe.whitelist()
+def signing_status(doctype, name):
+	"""Where KRA signing stands for one invoice - polled by the POS before it
+	prints the receipt, which must carry KRA's signature."""
+	doc = frappe.get_doc(doctype, name)
+	doc.check_permission("read")
+	if doc.docstatus != 1 or not signs(doc.company, doctype) or doc.get("royce_prevent_etims_submission"):
+		return {"applies": False}
+	return {
+		"applies": True,
+		"status": doc.royce_etims_status,
+		"invoice_number": doc.royce_etims_invoice_number,
+		"error": doc.royce_etims_error if doc.royce_etims_status == "Failed" else None,
+	}
+
+
 def _build_receipt_block(doc, settings):
 	"""KRA's nested `receipt` object - drives what actually prints on the
 	fiscal receipt (trade name, address, header/footer messages), separate

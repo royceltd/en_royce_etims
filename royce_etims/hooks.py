@@ -48,7 +48,7 @@ add_to_apps_screen = [
 # webform_include_css = {"doctype": "public/css/doctype.css"}
 
 # include js in page
-# page_js = {"page" : "public/js/file.js"}
+page_js = {"point-of-sale": "public/js/point_of_sale.js"}
 
 # include js in doctype views
 doctype_js = {
@@ -173,6 +173,9 @@ doc_events = {
 		],
 		"before_cancel": "royce_etims.etims_sync.receipt.before_cancel",
 		"on_cancel": "royce_etims.etims_sync.stock.on_cancel",
+	},
+	"POS Profile": {
+		"validate": "royce_etims.etims_sync.receipt.validate_pos_profile",
 	},
 	"Customer": {
 		"on_update": "royce_etims.etims_sync.customer.on_update",
