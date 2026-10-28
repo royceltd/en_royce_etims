@@ -230,6 +230,19 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 		self.assertEqual((line["taxblAmt"], line["taxAmt"]), (1160, 185.6))
 		self.assertEqual((payload["totAmt"], payload["totTaxAmt"]), (1345.6, 185.6))
 
+	def test_band_totals_are_whole_cents(self):
+		"""golive.localhost ACC-SINV-2026-00001, 2026-10-28: 862.07 + 900 summed as
+		floats was sent as totTaxblAmt 1762.0700000000002 and refused."""
+		item = self._make_payload_item()
+		doc = self._invoice(item, net=862.07, vat=137.93, qty=4)
+		doc.items.append(
+			frappe._dict(name="row2", idx=2, item_code=item.item_code, qty=1, base_net_amount=900)
+		)
+		doc.base_grand_total = 2044
+		payload = self._payload(doc, {"row1": 137.93, "row2": 144})
+		self.assertEqual((payload["taxblAmtB"], payload["totTaxblAmt"]), (1762.07, 1762.07))
+		self.assertEqual(payload["totTaxAmt"], 281.93)
+
 	def test_band_b_line_with_no_vat_posted_is_refused(self):
 		"""ACC-SINV-2026-00006: no VAT row on the invoice, so the books had no VAT,
 		but the payload would have sent 160."""

@@ -11,6 +11,7 @@ from royce_etims.etims_sync.stock import (
 	build_stock_io_payload,
 	net_item_movements,
 	sar_type_for,
+	stock_changes,
 	vat_inclusive_amounts,
 )
 from royce_etims.setup.utils import TEST_COMPANY
@@ -39,6 +40,20 @@ class IntegrationTestStockMapping(IntegrationTestCase):
 			frappe._dict(item_code="B", actual_qty=2, stock_value_difference=200),
 		]
 		self.assertEqual(net_item_movements(sles), {"B": {"qty": 5.0, "value": 500.0}})
+
+	def test_reconciliation_change_is_new_minus_current_qty(self):
+		doc = frappe._dict(
+			doctype="Stock Reconciliation",
+			items=[
+				frappe._dict(item_code="A", qty=50, current_qty=0, amount_difference=9000),
+				frappe._dict(item_code="B", qty=3, current_qty=5, amount_difference=-200),
+				frappe._dict(item_code="C", qty=7, current_qty=7, amount_difference=10),
+			],
+		)
+		self.assertEqual(
+			net_item_movements(stock_changes(doc)),
+			{"A": {"qty": 50.0, "value": 9000.0}, "B": {"qty": -2.0, "value": -200.0}},
+		)
 
 	def test_vat_inclusive_amounts_match_kra(self):
 		# KRA's own expected figure for 10 x 1000 at 16% (sandbox, 2026-10-26).

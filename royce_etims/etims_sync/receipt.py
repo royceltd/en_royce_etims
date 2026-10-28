@@ -472,11 +472,13 @@ def build_receipt_payload(doc, invc_no, settings):
 		"rfdDt": posting_date.strftime("%Y%m%d") + "000000" if is_return else None,
 		"rfdRsnCd": doc.get("royce_etims_refund_reason") if is_return else None,
 		"totItemCnt": len(items_payload),
-		**{f"taxblAmt{c}": taxbl[c] for c in TAX_CODES},
+		# Summed as floats, two bands can come to 1762.0700000000002, which KRA
+		# refuses ("More than 2 decimal places") - FOUND 2026-10-28.
+		**{f"taxblAmt{c}": money(taxbl[c]) for c in TAX_CODES},
 		**{f"taxRt{c}": rates[c] for c in TAX_CODES},
-		**{f"taxAmt{c}": tax[c] for c in TAX_CODES},
-		"totTaxblAmt": sum(taxbl.values()),
-		"totTaxAmt": sum(tax.values()),
+		**{f"taxAmt{c}": money(tax[c]) for c in TAX_CODES},
+		"totTaxblAmt": money(sum(taxbl.values())),
+		"totTaxAmt": money(sum(tax.values())),
 		"totAmt": flt(kra_total, 2),
 		"prchrAcptcYn": "N",
 		"remark": None,

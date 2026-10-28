@@ -91,6 +91,27 @@ def sar_type_for(voucher_type, direction, is_return=False, purpose=None):
 	return SAR_ADJUST_IN if incoming else SAR_ADJUST_OUT
 
 
+def stock_changes(doc):
+	"""Per-item quantity and value changes a voucher made, shaped like Stock
+	Ledger Entry rows. A Stock Reconciliation's ledger rows carry the new
+	balance with actual_qty 0 - FOUND 2026-10-28: opening stock never reached
+	KRA - so its change comes from its own rows (new qty minus current qty)."""
+	if doc.doctype == "Stock Reconciliation":
+		return [
+			frappe._dict(
+				item_code=row.item_code,
+				actual_qty=flt(row.qty) - flt(row.current_qty),
+				stock_value_difference=flt(row.amount_difference),
+			)
+			for row in doc.get("items")
+		]
+	return frappe.get_all(
+		"Stock Ledger Entry",
+		filters={"voucher_type": doc.doctype, "voucher_no": doc.name, "is_cancelled": 0},
+		fields=["item_code", "actual_qty", "stock_value_difference"],
+	)
+
+
 def net_item_movements(sles):
 	"""Group SLE rows by item into {item_code: {"qty": signed qty, "value": abs
 	value}}, dropping items whose movements cancel out."""
@@ -167,11 +188,7 @@ def on_submit(doc, method=None):
 	if not settings:
 		return
 
-	sles = frappe.get_all(
-		"Stock Ledger Entry",
-		filters={"voucher_type": doc.doctype, "voucher_no": doc.name, "is_cancelled": 0},
-		fields=["item_code", "actual_qty", "stock_value_difference"],
-	)
+	sles = stock_changes(doc)
 	branch = doc.get("royce_etims_branch") or settings.default_branch
 	created = False
 	for direction in ("In", "Out"):
