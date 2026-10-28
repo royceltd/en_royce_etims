@@ -19,6 +19,7 @@ from royce_etims.etims_sync.item import (
 	REQUIRED_ETIMS_ITEM_FIELDS,
 	_validate_ready_to_sync,
 	build_item_payload,
+	fill_defaults,
 	item_code_prefix,
 	next_item_code,
 )
@@ -39,6 +40,7 @@ def _complete_item(**overrides):
 		royce_etims_origin_nation="KE",
 		royce_etims_packaging_unit="NT",
 		royce_etims_quantity_unit="BA",
+		royce_etims_quantity_unit_code="BA",
 		royce_etims_id_mapping=[],
 	)
 	item.update(overrides)
@@ -89,21 +91,22 @@ class IntegrationTestItemSync(IntegrationTestCase):
 		)
 		self.assertEqual(item_code_prefix(item), "KE2NTBA")
 
-	def test_next_item_code_follows_kra_sequence_per_prefix(self):
-		"""Real sandbox itemInfo for TIN P051909825V, 2026-10-26: mixed 7- and
-		8-digit tails under KE2NTBA, plus other prefixes that must not count."""
-		known = [
-			"KE1NTXU1000005",
-			"KE2NTBA00000001",
-			"KE2NTBA00000002",
-			"KE2NTBA00000003",
-			"KE2NTBA0000004",
-			"KE3BAXBAX00002",
-		]
-		self.assertEqual(next_item_code("KE2NTBA", known), "KE2NTBA0000005")
+	def test_next_item_code_continues_the_pins_sequence_across_prefixes(self):
+		"""One sequence per PIN (KRA wanted ********7 for a new KE2NTKG prefix
+		after KE2NTBA...6), read from either tail width, with a unit ending in
+		a digit (M2) not mistaken for part of the sequence."""
+		known = ["KE2NTBA00000003", "KE2NTBA0000006", "KE2NTKG0000005", "KE2NTM20000002", None]
+		self.assertEqual(next_item_code("KE2NTM2", known), "KE2NTM20000007")
 
-	def test_next_item_code_starts_at_one_for_a_new_prefix(self):
-		self.assertEqual(next_item_code("KE3NTU", ["KE2NTBA0000004", None]), "KE3NTU0000001")
+	def test_next_item_code_starts_at_one_for_a_new_pin(self):
+		self.assertEqual(next_item_code("KE2NTNO", []), "KE2NTNO0000001")
+
+	def test_quantity_unit_must_be_two_letters(self):
+		for unit in ("U", "LTR"):
+			with self.assertRaises(frappe.ValidationError):
+				_validate_ready_to_sync(
+					_complete_item(royce_etims_quantity_unit_code=unit), "Royce Technologies LTD"
+				)
 
 	def test_prevent_etims_submission_raises_regardless_of_other_fields(self):
 		item = _complete_item(royce_prevent_etims_submission=1)
@@ -175,3 +178,73 @@ class IntegrationTestItemSync(IntegrationTestCase):
 			),
 			("B", "B", 16),
 		)
+
+
+class IntegrationTestItemDefaults(IntegrationTestCase):
+	def tearDown(self):
+		frappe.db.rollback()
+
+	def setUp(self):
+		for doctype, code in (
+			("eTIMS Country of Origin", "KE"),
+			("eTIMS Item Type", "2"),
+			("eTIMS Item Type", "3"),
+			("eTIMS Packaging Unit", "NT"),
+			("eTIMS Quantity Unit", "NO"),
+			("eTIMS Item Classification", "1010151700"),
+		):
+			if not frappe.db.exists(doctype, code):
+				frappe.get_doc({"doctype": doctype, "code": code, "description": code}).insert(
+					ignore_permissions=True
+				)
+		frappe.db.set_value("UOM", "Nos", "royce_etims_quantity_unit", "NO")
+
+	def test_new_stock_item_gets_kra_defaults_and_codes(self):
+		doc = frappe._dict(is_stock_item=1, stock_uom="Nos", item_group=None)
+		fill_defaults(doc)
+		self.assertEqual(
+			(
+				doc.royce_etims_origin_nation_code,
+				doc.royce_etims_item_type_code,
+				doc.royce_etims_packaging_unit_code,
+				doc.royce_etims_quantity_unit_code,
+			),
+			("KE", "2", "NT", "NO"),
+		)
+
+	def test_non_stock_item_is_a_service(self):
+		doc = frappe._dict(is_stock_item=0, stock_uom="Nos", item_group=None)
+		fill_defaults(doc)
+		self.assertEqual(doc.royce_etims_item_type, "3")
+
+	def test_values_already_set_are_kept(self):
+		doc = frappe._dict(
+			is_stock_item=1,
+			stock_uom="Nos",
+			item_group=None,
+			royce_etims_quantity_unit="BA",
+			royce_etims_origin_nation="UG",
+		)
+		fill_defaults(doc)
+		self.assertEqual((doc.royce_etims_quantity_unit, doc.royce_etims_origin_nation), ("BA", "UG"))
+
+	def test_category_comes_from_the_nearest_group_that_has_one(self):
+		parent = frappe.get_doc(
+			{
+				"doctype": "Item Group",
+				"item_group_name": "_Test KRA Parent Group",
+				"parent_item_group": "All Item Groups",
+				"is_group": 1,
+				"royce_etims_item_classification": "1010151700",
+			}
+		).insert(ignore_permissions=True)
+		child = frappe.get_doc(
+			{
+				"doctype": "Item Group",
+				"item_group_name": "_Test KRA Child Group",
+				"parent_item_group": parent.name,
+			}
+		).insert(ignore_permissions=True)
+		doc = frappe._dict(is_stock_item=1, stock_uom="Nos", item_group=child.name)
+		fill_defaults(doc)
+		self.assertEqual(doc.royce_etims_item_classification_code, "1010151700")

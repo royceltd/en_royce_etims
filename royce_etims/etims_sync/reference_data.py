@@ -25,6 +25,7 @@ to them, and a missing row in one response isn't proof KRA withdrew a code.
 import frappe
 from frappe import _
 
+from royce_etims.etims_sync.item import map_common_uoms
 from royce_etims.utils.api_client import get_settings
 from royce_etims.utils.api_client import request as etims_request
 
@@ -131,6 +132,7 @@ def sync_reference_data(company):
 		reference_name=company,
 	)
 	_apply_item_classes(_response_data(class_data).get("itemClsList") or [], counts)
+	map_common_uoms()
 
 	frappe.db.commit()
 	return counts

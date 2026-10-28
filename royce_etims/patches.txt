@@ -15,3 +15,4 @@ royce_etims.patches.v0_0.add_etims_refund_reason_field
 royce_etims.patches.v0_0.add_etims_customer_fields
 royce_etims.patches.v0_0.set_item_tax_template_etims_bands
 royce_etims.patches.v0_0.align_rounding_with_kra
+royce_etims.patches.v0_0.item_kra_tab_and_defaults

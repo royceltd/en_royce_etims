@@ -181,7 +181,10 @@ doc_events = {
 		"validate": "royce_etims.etims_sync.tax_lines.set_default_band",
 	},
 	"Item": {
-		"validate": "royce_etims.etims_sync.item.fill_taxation_type",
+		"validate": [
+			"royce_etims.etims_sync.item.fill_defaults",
+			"royce_etims.etims_sync.item.fill_taxation_type",
+		],
 	},
 	"Purchase Receipt": _STOCK_EVENTS,
 	"Purchase Invoice": _STOCK_EVENTS,

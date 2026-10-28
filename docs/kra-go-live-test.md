@@ -191,3 +191,24 @@ Proposed design, not started:
 Open decision: confirm on **Purchase Invoice** (recommended) or on **Purchase Receipt**.
 Until built, stock bought on a Purchase Receipt/Invoice isn't sellable at KRA; workaround is a
 Material Receipt (type 06), which misstates purchases as adjustments — sandbox only.
+
+## Item codes: two rules found 2026-10-29
+
+- **One sequence per PIN.** With KE2NTBA…0000006 registered, `KE2NTKG0000001` was refused
+  ("Expected sequence ending with ********7"); `KE2NTKG0000007` was accepted. The code used to
+  restart at 1 for every new prefix, so the first item with a new unit or packaging always failed.
+- **Quantity unit must be 2 characters.** Every form tried for U (pieces) and LTR (litres) was
+  refused with "The ItemCd isn't made up of correct QtyUnitCd": `KE2NTU…`, `KE2NTXU…` (the shape
+  of KRA's own harness items), `KE2NTLTR…`, `KE2NTLT…`, 7 and 8 digit tails. KG and NO were
+  accepted. Sync to eTIMS now refuses a non-2-letter unit with a plain message, and Nos maps to
+  NO (Number). **Ask KRA how litres, grams, metres and tonnes are coded** — fuel stations need
+  litres.
+
+## Item form (2026-10-29)
+
+KRA fields moved to their own **KRA eTIMS** tab (the old section after Item Group swallowed
+ERPNext's Default Unit of Measure, Maintain Stock…). Plain labels; the KRA Item Code table is
+read-only; the six code fields are hidden (the dropdowns show them); category, type, origin,
+packaging and unit lock once registered. New items fill empty fields: Kenya, Finished Product
+(stock) / Service (non-stock), Net packaging, quantity unit from the UOM's new *KRA Quantity
+Unit*, category from the Item Group's new *KRA Product Category* (nearest parent group).

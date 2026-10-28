@@ -13,9 +13,13 @@ reference doctypes (eTIMS Item Classification, eTIMS Taxation Type, ...).
 
 itemCd is generated here, not typed in: origin country + item type +
 packaging unit + quantity unit + a 7-digit sequence, e.g. KE2NTBA0000005.
-KRA enforces the sequence per prefix - CONFIRMED 2026-10-26: with
-KE2NTBA...1-3 registered, saveItem rejected a timestamp-based code with
-"Invalid itemCd Sequence. Expected sequence ending with: ********4". 7 digits
+KRA enforces one sequence per PIN, across all prefixes - CONFIRMED
+2026-10-26 ("Expected sequence ending with: ********4" after KE2NTBA...1-3)
+and 2026-10-29 (a new KE2NTKG prefix had to continue at 7, not restart at 1).
+The quantity unit must be 2 characters: KRA refused every form of a code for
+U and LTR tried on 2026-10-29 ("The ItemCd isn't made up of correct
+QtyUnitCd" - KE2NTU..., KE2NTXU..., KE2NTLTR..., KE2NTLT...) and accepted
+KG and NO. 7 digits
 matches KRA's own test-harness items (KE1NTXU1000001) and the Odoo/Navari
 OSCU integrations; the sandbox also accepted 8 (the Postman sample's
 KE2NTBA00000001), so the sequence is read from either width.
@@ -30,6 +34,9 @@ from royce_etims.utils.api_client import request as etims_request
 from royce_etims.utils.id_mapping import SETUP_DOCTYPE, get_etims_id, set_etims_id
 
 ITEM_CODE_SEQUENCE_DIGITS = 7
+
+# Country (2) + item type (1) + packaging (2) + quantity unit (2).
+ITEM_CODE_PREFIX_LENGTH = 7
 
 # The four reference codes an itemCd's prefix is built from, in order.
 ITEM_CODE_PREFIX_FIELDS = (
@@ -60,13 +67,16 @@ def item_code_prefix(item):
 
 
 def next_item_code(prefix, known_codes):
-	"""Next itemCd for `prefix`, one past the highest sequence among
-	`known_codes` that share it. Codes with a non-numeric tail are ignored."""
+	"""`prefix` plus one past the highest sequence among all `known_codes` of
+	this PIN. KRA counts one sequence per PIN, not per prefix - CONFIRMED
+	2026-10-29: with KE2NTBA...0000006 registered, KE2NTKG0000001 was refused
+	("Expected sequence ending with ********7") and KE2NTKG0000007 accepted.
+	The prefix is always ITEM_CODE_PREFIX_LENGTH characters (2-character units
+	only, see _validate_ready_to_sync), so the sequence is everything after it -
+	a unit like M2 ends in a digit, so trailing digits alone would misread it."""
 	highest = 0
 	for code in known_codes:
-		if not code or not code.startswith(prefix):
-			continue
-		tail = code[len(prefix) :]
+		tail = (code or "")[ITEM_CODE_PREFIX_LENGTH:]
 		if tail.isdigit():
 			highest = max(highest, int(tail))
 	return f"{prefix}{highest + 1:0{ITEM_CODE_SEQUENCE_DIGITS}d}"
@@ -85,17 +95,13 @@ def _kra_item_codes(company, branch):
 	return [row.get("itemCd") for row in (body.get("data") or {}).get("itemList") or []]
 
 
-def _known_item_codes(company, prefix, kra_codes):
+def _known_item_codes(company, kra_codes):
 	"""KRA's codes plus any we've recorded locally - KRA is the authority on
 	the sequence, the local list only covers a registration KRA hasn't
 	reflected yet."""
 	local_codes = frappe.get_all(
 		"eTIMS ID Mapping",
-		filters={
-			"setup_doctype": SETUP_DOCTYPE,
-			"setup_docname": company,
-			"etims_id": ["like", f"{prefix}%"],
-		},
+		filters={"setup_doctype": SETUP_DOCTYPE, "setup_docname": company},
 		pluck="etims_id",
 	)
 	return kra_codes + local_codes
@@ -135,13 +141,87 @@ def _validate_ready_to_sync(item, company):
 	if item.royce_prevent_etims_submission:
 		frappe.throw(_("Item {0} has 'Prevent eTIMS Submission' checked.").format(item.name))
 
-	missing = [f for f in REQUIRED_ETIMS_ITEM_FIELDS if not item.get(f)]
+	meta = frappe.get_meta("Item")
+	missing = [meta.get_label(f) for f in REQUIRED_ETIMS_ITEM_FIELDS if not item.get(f)]
 	if missing:
 		frappe.throw(
-			_("Fill in the eTIMS section on Item {0} before syncing - missing: {1}").format(
+			_("Fill in the KRA eTIMS tab on Item {0} before syncing - missing: {1}").format(
 				item.name, ", ".join(missing)
 			)
 		)
+	unit = item.get("royce_etims_quantity_unit_code") or ""
+	if len(unit) != 2:
+		frappe.throw(
+			_(
+				"KRA only accepts item codes with a 2-letter quantity unit, and {0} isn't one. Pick a 2-letter unit for Item {1}, such as Number (NO), Kilo-Gramme (KG), box (BX) or bag (BG)."
+			).format(unit, item.name)
+		)
+
+
+# ERPNext's standard units of measure -> KRA quantity unit (code class 10).
+# Only 2-letter units: KRA refuses item codes built from the others (U, L,
+# LTR, GRM, TNE...), so litres, grams etc. are left for the accountant until
+# KRA says how to code them. Only fills a UOM that has none.
+UOM_QUANTITY_UNITS = {
+	"Nos": "NO",
+	"Unit": "NO",
+	"Kg": "KG",
+	"Box": "BX",
+	"Pair": "PR",
+	"Square Meter": "M2",
+	"Cubic Meter": "M3",
+}
+
+
+def map_common_uoms():
+	"""Give the standard UOMs their KRA quantity unit. Runs after KRA's code
+	lists are synced (the units come from there) and from a patch."""
+	for uom, unit in UOM_QUANTITY_UNITS.items():
+		if (
+			frappe.db.exists("UOM", uom)
+			and frappe.db.exists("eTIMS Quantity Unit", unit)
+			and not frappe.db.get_value("UOM", uom, "royce_etims_quantity_unit")
+		):
+			frappe.db.set_value("UOM", uom, "royce_etims_quantity_unit", unit, update_modified=False)
+
+
+def _group_classification(item_group):
+	"""The KRA product category of the item's group, or of its nearest parent group that has one."""
+	while item_group:
+		group = frappe.db.get_value(
+			"Item Group", item_group, ["royce_etims_item_classification", "parent_item_group"], as_dict=True
+		)
+		if not group:
+			return None
+		if group.royce_etims_item_classification:
+			return group.royce_etims_item_classification
+		item_group = group.parent_item_group
+	return None
+
+
+def _fill(doc, field, value, reference_doctype):
+	"""Set an empty KRA field and its code. The code is set too because this
+	runs after fetch_from (see fill_taxation_type); the lists are named by code."""
+	if doc.get(field) or not value or not frappe.db.exists(reference_doctype, value):
+		return
+	doc.update({field: value, f"{field}_code": value})
+
+
+def fill_defaults(doc, method=None):
+	"""Item validate hook: fill the KRA fields a new item can't do without, from
+	what ERPNext already knows. Never overwrites a value."""
+	_fill(doc, "royce_etims_origin_nation", "KE", "eTIMS Country of Origin")
+	_fill(doc, "royce_etims_item_type", "2" if doc.get("is_stock_item") else "3", "eTIMS Item Type")
+	_fill(doc, "royce_etims_packaging_unit", "NT", "eTIMS Packaging Unit")
+	if doc.get("stock_uom"):
+		unit = frappe.db.get_value("UOM", doc.stock_uom, "royce_etims_quantity_unit")
+		_fill(doc, "royce_etims_quantity_unit", unit, "eTIMS Quantity Unit")
+	_fill(
+		doc,
+		"royce_etims_item_classification",
+		_group_classification(doc.get("item_group")),
+		"eTIMS Item Classification",
+	)
 
 
 def fill_taxation_type(doc, method=None):
@@ -192,7 +272,7 @@ def sync_item(item_code, company):
 
 	if is_new_code:
 		prefix = item_code_prefix(item)
-		item_cd = next_item_code(prefix, _known_item_codes(company, prefix, kra_codes))
+		item_cd = next_item_code(prefix, _known_item_codes(company, kra_codes))
 	elif item_cd in kra_codes:
 		# KRA rejects saveItem for an itemCd it already holds ("The itemCd is
 		# either reused or not incremented properly") - CONFIRMED 2026-10-26
