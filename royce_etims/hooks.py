@@ -164,12 +164,14 @@ _STOCK_EVENTS = {
 doc_events = {
 	"POS Invoice": {
 		"on_submit": "royce_etims.etims_sync.receipt.on_submit",
+		"before_cancel": "royce_etims.etims_sync.receipt.before_cancel",
 	},
 	"Sales Invoice": {
 		"on_submit": [
 			"royce_etims.etims_sync.receipt.on_submit",
 			"royce_etims.etims_sync.stock.on_submit",
 		],
+		"before_cancel": "royce_etims.etims_sync.receipt.before_cancel",
 		"on_cancel": "royce_etims.etims_sync.stock.on_cancel",
 	},
 	"Customer": {

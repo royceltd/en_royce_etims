@@ -122,6 +122,28 @@ def on_submit(doc, method=None):
 	_enqueue_sync(doc.doctype, doc.name)
 
 
+def before_cancel(doc, method=None):
+	"""doc_events hook for Sales Invoice and POS Invoice before_cancel. KRA has
+	no cancel for a signed invoice - it keeps it for good, so the books must
+	too; the way back is a credit note, which KRA signs against the original.
+
+	A locking read: a sync in flight holds this row until it records Sent, so
+	a cancel arriving mid-call waits and sees the result instead of a stale
+	Pending."""
+	status, invoice_no = frappe.db.get_value(
+		doc.doctype, doc.name, ["royce_etims_status", "royce_etims_invoice_number"], for_update=True
+	) or (None, None)
+	if status != "Sent":
+		return
+
+	frappe.throw(
+		_(
+			"KRA eTIMS has signed {0} as CU invoice no. {1}, so it can't be cancelled. Raise a credit note instead: Create > Return / Credit Note."
+		).format(doc.name, invoice_no),
+		title=_("Signed by KRA eTIMS"),
+	)
+
+
 def _enqueue_sync(doctype, name):
 	"""One queued sync per document at a time - the submit hook, the retry
 	sweep and the Retry button can all ask for the same one."""
@@ -152,9 +174,12 @@ def sync_receipt(doctype, name):
 
 	lock_branch(branch.name)
 	# A locking read: a plain one would see this transaction's older snapshot.
-	if frappe.db.get_value(doctype, name, "royce_etims_status", for_update=True) == "Sent":
+	status, docstatus = frappe.db.get_value(
+		doctype, name, ["royce_etims_status", "docstatus"], for_update=True
+	)
+	if status == "Sent" or docstatus != 1:
 		frappe.db.rollback()
-		return  # another job (e.g. the retry sweep) already signed it
+		return  # another job (e.g. the retry sweep) already signed it, or it was cancelled while queued
 
 	def send(invc_no):
 		return etims_request(

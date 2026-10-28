@@ -25,8 +25,10 @@ from royce_etims.etims_sync.receipt import (
 	_build_receipt_block,
 	_get_tax_rates,
 	_original_invoice_number,
+	before_cancel,
 	build_receipt_payload,
 	retry_receipt,
+	sync_receipt,
 )
 from royce_etims.setup.utils import TEST_COMPANY
 
@@ -359,3 +361,43 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 	def test_retry_refuses_other_doctypes(self):
 		with self.assertRaises(frappe.ValidationError):
 			retry_receipt("Purchase Invoice", "PINV-0001")
+
+	def _cancel_with(self, doctype, status, invoice_no=None):
+		doc = _FakeDoc(doctype=doctype, name="SINV-CANCEL-TEST")
+		with patch("frappe.db.get_value", return_value=(status, invoice_no)) as get_value:
+			before_cancel(doc)
+		self.assertTrue(get_value.call_args.kwargs.get("for_update"))
+
+	def test_cancel_refused_once_kra_has_signed(self):
+		for doctype in ("Sales Invoice", "POS Invoice"):
+			with self.assertRaises(frappe.ValidationError) as ctx:
+				self._cancel_with(doctype, "Sent", 4)
+			self.assertIn("credit note", str(ctx.exception))
+			self.assertIn("4", str(ctx.exception))
+
+	def test_cancel_allowed_when_kra_never_signed(self):
+		for status in ("Not Applicable", "Pending", "Failed", None):
+			self._cancel_with("Sales Invoice", status)
+
+	def test_cancel_hook_registered_for_both_invoice_doctypes(self):
+		for doctype in ("Sales Invoice", "POS Invoice"):
+			self.assertIn(
+				"royce_etims.etims_sync.receipt.before_cancel",
+				frappe.get_hooks("doc_events")[doctype]["before_cancel"],
+			)
+
+	def test_sync_never_signs_a_cancelled_invoice(self):
+		doc = _FakeDoc(
+			doctype="Sales Invoice", name="SINV-CANCELLED", company=TEST_COMPANY, royce_etims_branch="B"
+		)
+		branch = _FakeDoc(name="B", device_status="Active")
+		with (
+			patch("frappe.get_doc", side_effect=[doc, branch]),
+			patch("frappe.get_cached_doc"),
+			patch("royce_etims.etims_sync.receipt.lock_branch"),
+			patch("frappe.db.get_value", return_value=("Pending", 2)),
+			patch("frappe.db.rollback"),
+			patch("royce_etims.etims_sync.receipt.send_in_sequence") as send,
+		):
+			sync_receipt("Sales Invoice", "SINV-CANCELLED")
+		send.assert_not_called()

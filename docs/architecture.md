@@ -697,6 +697,11 @@ just a config change.
   until KRA fixes branch 02's invcNo counter. Return stock is confirmed live (sarNo 11, type 03).
   The seven reference lists are now readable by every Desk User (they were System Manager only,
   so a cashier couldn't pick a refund reason, nor an Item Manager a classification).
+- **Signed invoices can't be cancelled (2026-10-28).** KRA has no cancel for a signed invoice, so
+  a Sales/POS Invoice with eTIMS Status *Sent* refuses to cancel (`receipt.before_cancel`) and
+  points to a credit note. The check is a locking read, so a cancel arriving while the sync job is
+  mid-call waits for it and sees *Sent*. Pending/Failed invoices still cancel, and `sync_receipt`
+  skips one cancelled while queued. Verified live: ACC-SINV-2026-00009 (KRA invoice 4) refused.
 - **Compliance reports (2026-10-26).** *eTIMS Compliance Status* lists everything KRA hasn't
   accepted (unsigned invoices/credit notes, unsent stock movements, unregistered items) with
   error, age and retries; *eTIMS VAT Summary* totals taxable/VAT per band from the payloads KRA
