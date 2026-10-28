@@ -122,3 +122,72 @@ Friction for the client guide / onboarding:
 - Each item needs five eTIMS fields (classification, type, origin, packaging, quantity unit).
 - An invoice that fails a local check leaves no eTIMS Log; the reason is only in eTIMS Error on the
   invoice.
+
+## How KRA counts stock for its sale check (found 2026-10-29)
+
+KRA has no call that returns a stock balance (`itemInfo` has no quantity; `selectStockMoveLists`
+only lists stock sent to us by others). The sale check's rejection names it, so a sale for
+1,000,000 units reads the balance without signing anything (counter unchanged). Read on
+golive.localhost after the walk-through and the user's purchase test:
+
+| Item | ERPNext | KRA | Movements sent |
+|---|---|---|---|
+| Bar Soap 1kg | 47 | 47 | opening +50 (06), signed sale 4 + stock-out 4 (11), signed credit note 1 + stock-in 1 (03) |
+| Maize Flour 2kg | 75 | 75 | opening +80 (06), signed sale 5 + stock-out 5 (11) |
+| Soko maize mean | 1 | 0 | opening +1 (06), signed sale 1 with no stock-out, purchase receipt +1 (02), delivery note stock-out 1 (11) |
+
+The only reading that fits all three, plus "0 remaining" before the delivery note: **KRA's sellable
+balance = adjustments (type 06) − signed sales + signed credit notes.** Signing a sale deducts it;
+our stock-outs (11) and returns (03) don't change it again (no double count), and a purchase
+stock-in (02) doesn't add to it. Stock bought must presumably reach KRA through its purchase flow
+(`sendPurchaseTransactionInfo`) to become sellable — so purchases are required for go-live.
+Not yet confirmed by KRA; next check: a Material Receipt (06) for Soko should make it 1.
+
+## Purchases — what KRA does (found 2026-10-29)
+
+**`getPurchaseTransactionInfo`** returns `saleList`: every signed sale another taxpayer made with
+our PIN as `custTin`. Per sale: `spplrTin`, `spplrNm`, `spplrBhfId`, `spplrInvcNo`, `spplrSdcId`,
+`spplrMrcNo`, `rcptTyCd`, `pmtTyCd`, `salesDt`, band totals, and `itemList` with the **supplier's**
+`itemCd`/`itemClsCd`/`itemNm`, units, `qty`, `prc`, `taxTyCd`, amounts.
+- Our PIN (P051909825V) sees the test PIN's invoices 6, 8, 9 — all sales made to it. The credit
+  note (invoice 7) is **not** listed; only `rcptTyCd "S"` came back.
+- The test PIN sees sales **from our PIN's branch 02, invoices 6-10, "Completed by Automated User",
+  2026-09-23 13:52** — KRA's certification harness signed invoices on our branch 02. That is why
+  branch 02 says "Invoice number already exists" for 1 while its sequence check expects 1. Send
+  this to KRA support.
+
+**`sendPurchaseTransactionInfo`** confirms one of those purchases. Accepted on the test PIN for
+supplier invoice 6 as purchase `invcNo` 1 (own counter, KRA's `lastPchsInvcNo`):
+- `regTyCd "A"` (from KRA's list), `pchsTyCd "N"`, `rcptTyCd "P"`, `pchsSttsCd "02"`,
+  `spplrTin`/`spplrBhfId`/`spplrNm`/`spplrInvcNo` from the list.
+- Each line carries **our** `itemCd`/`itemClsCd`/`itemNm` plus the supplier's as
+  `spplrItemCd`/`spplrItemClsCd`/`spplrItemNm` — the mapping supplier item → our item is ours to make.
+- Amounts are **recomputed** KRA's way from `qty` × `prc`, like sales: KRA's own list had
+  `splyAmt` 8308 and `taxblAmt` 8308 for a 9637.24 line and refused both ("Expected: 9637.24",
+  "Expected: 8307.97"). Line `taxblAmt`/`taxAmt` = `kra_split(qty × prc)`, totals summed and rounded.
+- **Effect: the confirmed quantities became sellable** (Soko 1 → 2, Maize Flour 75 → 76). A Purchase
+  Receipt's stock-in (type 02) does not do this. So: stock bought from an eTIMS supplier is sellable
+  at KRA only after the purchase is confirmed.
+
+Open: suppliers not on eTIMS (`regTyCd "M"`, as in KRA's sample with `spplrTin` P000000000D);
+rejecting a purchase (`pchsSttsCd` other codes); supplier credit notes; how the purchase list
+pages (`lastReqDt`).
+
+## Purchases feature — PENDING (parked by the founder 2026-10-29)
+
+Proposed design, not started:
+1. **eTIMS Purchase inbox** — scheduled + "Fetch from KRA" pull of `getPurchaseTransactionInfo` per
+   branch; status New → Matched → Confirmed / Rejected.
+2. **Supplier** found by PIN (Tax ID) or created from KRA's name + PIN.
+3. **Item matching** remembered per supplier + supplier itemCd → our Item; one-click "register as
+   new item".
+4. **Create Purchase Invoice** (draft) from the inbox with KRA's quantities, prices, VAT.
+5. **Confirm on submit** via `sendPurchaseTransactionInfo` in a background job with retries; own
+   purchase counter on eTIMS Branch (resync like invcNo); status + KRA purchase number on the PI.
+6. Guard rails: amounts must match KRA's record; reject a purchase that isn't ours; Compliance
+   Status lists unconfirmed purchases.
+7. Later: non-eTIMS suppliers (`regTyCd "M"`), supplier credit notes, imports.
+
+Open decision: confirm on **Purchase Invoice** (recommended) or on **Purchase Receipt**.
+Until built, stock bought on a Purchase Receipt/Invoice isn't sellable at KRA; workaround is a
+Material Receipt (type 06), which misstates purchases as adjustments — sandbox only.
