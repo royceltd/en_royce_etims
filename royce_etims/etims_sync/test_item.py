@@ -274,6 +274,14 @@ class IntegrationTestRegisteredItemTypeGuard(IntegrationTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			guard_registered_item_type(self._item("KE3NTNO0000014"))
 
+	def test_item_already_stocked_is_only_warned(self):
+		from royce_etims.etims_sync.item import guard_registered_item_type
+
+		item = frappe._dict(self._item("KE3NTNO0000014"))
+		item.is_new = lambda: False
+		item.has_value_changed = lambda field: False
+		guard_registered_item_type(item)  # no exception: price/tax edits stay possible
+
 	def test_allowed_cases(self):
 		from royce_etims.etims_sync.item import guard_registered_item_type
 

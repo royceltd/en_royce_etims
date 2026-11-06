@@ -256,19 +256,27 @@ def guard_registered_item_type(doc, method=None):
 	as a service. KRA then rejects every stock movement that includes it ("You
 	cannot add stock for a service") and the whole stockIO fails with it, while
 	saveItem won't re-register an item already known - FOUND 2026-11-05 on the
-	hospital demo (admission kit registered as a service, then stocked)."""
+	hospital demo (admission kit registered as a service, then stocked).
+
+	An item already in that state is only warned about on later saves, so its
+	price, taxes and description can still be maintained."""
 	if not doc.get("is_stock_item"):
 		return
 	for row in doc.get("royce_etims_id_mapping") or []:
 		code = row.etims_id or ""
-		if not row.disabled and code[ITEM_TYPE_POSITION : ITEM_TYPE_POSITION + 1] == SERVICE_ITEM_TYPE:
-			frappe.throw(
-				_(
-					"{0} is registered with KRA eTIMS as a service ({1}) for {2}, so KRA will refuse "
-					"stock for it. Create a separate stock item for the product instead."
-				).format(doc.name, code, row.setup_docname),
-				title=_("Registered with KRA as a service"),
-			)
+		if row.disabled or code[ITEM_TYPE_POSITION : ITEM_TYPE_POSITION + 1] != SERVICE_ITEM_TYPE:
+			continue
+		message = _(
+			"{0} is registered with KRA eTIMS as a service ({1}) for {2}, so KRA will refuse "
+			"stock for it. Create a separate stock item for the product instead."
+		).format(doc.name, code, row.setup_docname)
+		# frappe._dict answers hasattr() for anything, so check for a real method.
+		is_document = callable(getattr(doc, "has_value_changed", None))
+		becoming_stock = not is_document or doc.is_new() or doc.has_value_changed("is_stock_item")
+		if becoming_stock:
+			frappe.throw(message, title=_("Registered with KRA as a service"))
+		frappe.msgprint(message, title=_("Registered with KRA as a service"), indicator="orange")
+		return
 
 
 def _mark_failed(item, error):
