@@ -451,3 +451,49 @@ class IntegrationTestReceiptSync(IntegrationTestCase):
 			patch("royce_etims.etims_sync.receipt.signs", return_value=False),
 		):
 			self.assertEqual(signing_status("Sales Invoice", "X"), {"applies": False})
+
+
+class IntegrationTestTaxRateMismatchHeal(IntegrationTestCase):
+	"""KRA's code list and its sales check disagreed on band E on 2026-11-05:
+	the list said useYn "Y" (rate 8), sendSalesTransaction expected 0.00."""
+
+	KRA_ERROR = (
+		"eTIMS call to sendSalesTransaction failed (400): {'responseHeader': {'responseCode': 400, "
+		"'customerMessage': 'Validation failed', 'debugMessage': 'Rule taxRtE failed: Tax rate "
+		"mismatch. Expected: 0.00, Found: 8.0'}, 'responseBody': None}"
+	)
+
+	def setUp(self):
+		from royce_etims.etims_sync.reference_data import _upsert
+
+		_upsert("eTIMS Taxation Type", "E", {"description": "E-VAT 8%", "rate": 8, "disabled": 0})
+		frappe.db.set_value("eTIMS Taxation Type", "E", "zero_rate_on_receipts", 0)
+
+	def test_mismatch_sets_zero_rate_and_receipts_report_zero(self):
+		from royce_etims.etims_sync.receipt import _get_tax_rates, heal_tax_rate_mismatch
+
+		self.assertEqual(_get_tax_rates()["E"], 8)
+		self.assertEqual(heal_tax_rate_mismatch(self.KRA_ERROR), "E")
+		self.assertEqual(_get_tax_rates()["E"], 0)
+		# the band's own VAT rate and Disabled flag are untouched
+		self.assertEqual(frappe.db.get_value("eTIMS Taxation Type", "E", ["rate", "disabled"]), (8, 0))
+
+	def test_heal_is_once_only(self):
+		from royce_etims.etims_sync.receipt import heal_tax_rate_mismatch
+
+		heal_tax_rate_mismatch(self.KRA_ERROR)
+		self.assertIsNone(heal_tax_rate_mismatch(self.KRA_ERROR))
+
+	def test_kra_expecting_the_rate_clears_the_rule(self):
+		from royce_etims.etims_sync.receipt import _get_tax_rates, heal_tax_rate_mismatch
+
+		frappe.db.set_value("eTIMS Taxation Type", "E", "zero_rate_on_receipts", 1)
+		expects_8 = self.KRA_ERROR.replace("Expected: 0.00, Found: 8.0", "Expected: 8.00, Found: 0")
+		self.assertEqual(heal_tax_rate_mismatch(expects_8), "E")
+		self.assertEqual(_get_tax_rates()["E"], 8)
+
+	def test_other_errors_are_ignored(self):
+		from royce_etims.etims_sync.receipt import heal_tax_rate_mismatch
+
+		self.assertIsNone(heal_tax_rate_mismatch("Invoice number already exists."))
+		self.assertIsNone(heal_tax_rate_mismatch(None))

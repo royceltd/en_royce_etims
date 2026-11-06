@@ -187,6 +187,7 @@ doc_events = {
 		"validate": [
 			"royce_etims.etims_sync.item.fill_defaults",
 			"royce_etims.etims_sync.item.fill_taxation_type",
+			"royce_etims.etims_sync.item.guard_registered_item_type",
 		],
 	},
 	"Purchase Receipt": _STOCK_EVENTS,

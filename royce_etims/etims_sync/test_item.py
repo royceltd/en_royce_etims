@@ -248,3 +248,36 @@ class IntegrationTestItemDefaults(IntegrationTestCase):
 		doc = frappe._dict(is_stock_item=1, stock_uom="Nos", item_group=child.name)
 		fill_defaults(doc)
 		self.assertEqual(doc.royce_etims_item_classification_code, "1010151700")
+
+
+class IntegrationTestRegisteredItemTypeGuard(IntegrationTestCase):
+	"""FOUND 2026-11-05: an item registered with KRA as a service, then made a
+	stock item, made KRA reject the whole stockIO it appeared in."""
+
+	def _item(self, etims_id, is_stock_item=1, disabled=0):
+		return frappe._dict(
+			name="TEST-KIT",
+			is_stock_item=is_stock_item,
+			royce_etims_id_mapping=[
+				frappe._dict(
+					setup_doctype="eTIMS Settings",
+					setup_docname="Test Co",
+					etims_id=etims_id,
+					disabled=disabled,
+				)
+			],
+		)
+
+	def test_stock_item_registered_as_service_is_refused(self):
+		from royce_etims.etims_sync.item import guard_registered_item_type
+
+		with self.assertRaises(frappe.ValidationError):
+			guard_registered_item_type(self._item("KE3NTNO0000014"))
+
+	def test_allowed_cases(self):
+		from royce_etims.etims_sync.item import guard_registered_item_type
+
+		guard_registered_item_type(self._item("KE2NTNO0000019"))  # registered as a product
+		guard_registered_item_type(self._item("KE3NTNO0000014", is_stock_item=0))  # still a service
+		guard_registered_item_type(self._item("KE3NTNO0000014", disabled=1))  # mapping retired
+		guard_registered_item_type(frappe._dict(name="NEW", is_stock_item=1))  # not registered yet

@@ -35,6 +35,7 @@ tax_lines.py. Rates come from the `eTIMS Taxation Type` reference doctype,
 synced from KRA's selectCodeList; a band KRA has disabled reports rate 0.
 """
 
+import re
 from decimal import Decimal
 
 import frappe
@@ -80,12 +81,47 @@ def _get_tax_rates():
 
 	A band KRA has disabled reports rate 0 - CONFIRMED 2026-10-26 with E
 	(VAT 8%, useYn "N"): "Rule taxRtE failed: Tax rate mismatch. Expected:
-	0.00, Found: 8.0"."""
+	0.00, Found: 8.0".
+
+	KRA's code list and its sales check can disagree: on 2026-11-05 the
+	sandbox code list turned E back to useYn "Y" (so the daily sync
+	re-enabled it) while sendSalesTransaction still expected taxRtE 0.00.
+	zero_rate_on_receipts records the sales check's rule separately, from
+	KRA's own rejection (heal_tax_rate_mismatch), and the sync never touches it."""
 	rates = dict.fromkeys(TAX_CODES, 0)
-	for row in frappe.get_all("eTIMS Taxation Type", fields=["code", "rate", "disabled"]):
-		if row.code in rates and not row.disabled:
+	for row in frappe.get_all(
+		"eTIMS Taxation Type", fields=["code", "rate", "disabled", "zero_rate_on_receipts"]
+	):
+		if row.code in rates and not row.disabled and not row.zero_rate_on_receipts:
 			rates[row.code] = row.rate or 0
 	return rates
+
+
+TAX_RATE_MISMATCH = re.compile(r"Rule taxRt([A-E]) failed: Tax rate mismatch\. Expected: ([0-9.]+)")
+
+
+def heal_tax_rate_mismatch(error_text):
+	"""When KRA rejects a receipt because a band's reported rate isn't the one
+	its sales check expects, record KRA's expectation on that band so the
+	retry sends the right rate. Returns the band healed, or None.
+
+	Only the receipt-rate rule is changed - never the band's VAT rate or its
+	Disabled flag, which drive the actual tax on invoices."""
+	match = TAX_RATE_MISMATCH.search(error_text or "")
+	if not match or not frappe.db.exists("eTIMS Taxation Type", match.group(1)):
+		return None
+	band, expected = match.group(1), float(match.group(2))
+	zero = 1 if expected == 0 else 0
+	if frappe.db.get_value("eTIMS Taxation Type", band, "zero_rate_on_receipts") == zero:
+		return None  # already as KRA expects - the mismatch is something else
+	frappe.db.set_value("eTIMS Taxation Type", band, "zero_rate_on_receipts", zero)
+	frappe.get_doc("eTIMS Taxation Type", band).add_comment(
+		"Info",
+		_("Receipts now report {0}% for band {1}: KRA rejected a receipt expecting {2}.").format(
+			"0" if zero else frappe.db.get_value("eTIMS Taxation Type", band, "rate"), band, expected
+		),
+	)
+	return band
 
 
 def on_submit(doc, method=None):
@@ -202,6 +238,8 @@ def sync_receipt(doctype, name):
 			"royce_etims_error", str(e)[:500], notify=False
 		)  # the whole message: local checks leave no eTIMS Log
 		doc.db_set("royce_etims_retry_count", (doc.royce_etims_retry_count or 0) + 1, notify=False)
+		if heal_tax_rate_mismatch(str(e)):
+			_enqueue_sync(doctype, name)  # once: a second mismatch on the same band won't heal again
 		frappe.db.commit()
 		return
 

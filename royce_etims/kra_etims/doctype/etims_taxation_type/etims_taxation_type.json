@@ -10,7 +10,8 @@
   "code",
   "description",
   "rate",
-  "disabled"
+  "disabled",
+  "zero_rate_on_receipts"
  ],
  "fields": [
   {
@@ -38,12 +39,19 @@
    "fieldname": "disabled",
    "fieldtype": "Check",
    "label": "Disabled"
+  },
+  {
+   "default": "0",
+   "description": "KRA's sales check expects 0.00 for this band on this PIN, even when its code list shows a rate. Set automatically from KRA's rejection (\"Rule taxRtX failed: Tax rate mismatch\"); the daily code sync never changes it.",
+   "fieldname": "zero_rate_on_receipts",
+   "fieldtype": "Check",
+   "label": "Report 0% on Receipts (KRA Rule)"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-26 13:00:00.000000",
+ "modified": "2026-11-06 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "KRA eTIMS",
  "name": "eTIMS Taxation Type",

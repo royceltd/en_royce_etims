@@ -246,6 +246,31 @@ def fill_taxation_type(doc, method=None):
 		doc.royce_etims_taxation_type_rate = frappe.db.get_value("eTIMS Taxation Type", band, "rate")
 
 
+# itemCd character 3 is KRA's item type: 1 raw material, 2 finished product, 3 service.
+ITEM_TYPE_POSITION = 2
+SERVICE_ITEM_TYPE = "3"
+
+
+def guard_registered_item_type(doc, method=None):
+	"""Item validate hook: refuse to make an item a stock item once KRA holds it
+	as a service. KRA then rejects every stock movement that includes it ("You
+	cannot add stock for a service") and the whole stockIO fails with it, while
+	saveItem won't re-register an item already known - FOUND 2026-11-05 on the
+	hospital demo (admission kit registered as a service, then stocked)."""
+	if not doc.get("is_stock_item"):
+		return
+	for row in doc.get("royce_etims_id_mapping") or []:
+		code = row.etims_id or ""
+		if not row.disabled and code[ITEM_TYPE_POSITION : ITEM_TYPE_POSITION + 1] == SERVICE_ITEM_TYPE:
+			frappe.throw(
+				_(
+					"{0} is registered with KRA eTIMS as a service ({1}) for {2}, so KRA will refuse "
+					"stock for it. Create a separate stock item for the product instead."
+				).format(doc.name, code, row.setup_docname),
+				title=_("Registered with KRA as a service"),
+			)
+
+
 def _mark_failed(item, error):
 	item.db_set(
 		{"royce_etims_sync_status": "Failed", "royce_etims_sync_error": frappe.utils.strip_html(str(error))},
