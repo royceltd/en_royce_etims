@@ -34,7 +34,7 @@ def _receipt_fields(insert_after):
 			"fieldtype": "Check",
 			"label": "Prevent eTIMS Submission",
 			"insert_after": "royce_etims_section",
-			"description": "Escape hatch to skip fiscalization for this specific document (pattern borrowed from navari_csf_ke).",
+			"description": "Tick to keep this document from being sent to KRA eTIMS.",
 		},
 		{
 			"fieldname": "royce_etims_branch",
@@ -51,7 +51,7 @@ def _receipt_fields(insert_after):
 			"label": "eTIMS Refund Reason",
 			"insert_after": "royce_etims_branch",
 			"depends_on": "eval:doc.is_return",
-			"description": "Required by KRA on a credit note (rfdRsnCd). Only enforced when eTIMS signs this document.",
+			"description": "Required by KRA on a credit note. KRA accepts reasons 01 to 06 only.",
 		},
 		{
 			"fieldname": "royce_etims_status",
@@ -60,6 +60,7 @@ def _receipt_fields(insert_after):
 			"options": "Not Applicable\nPending\nSent\nFailed",
 			"default": "Not Applicable",
 			"read_only": 1,
+			"no_copy": 1,
 			"in_list_view": 1,
 			"insert_after": "royce_etims_refund_reason",
 		},
@@ -73,6 +74,7 @@ def _receipt_fields(insert_after):
 			"fieldtype": "Int",
 			"label": "eTIMS Invoice No (invcNo)",
 			"read_only": 1,
+			"no_copy": 1,
 			"insert_after": "royce_etims_column_break",
 		},
 		{
@@ -80,6 +82,7 @@ def _receipt_fields(insert_after):
 			"fieldtype": "Small Text",
 			"label": "eTIMS Error",
 			"read_only": 1,
+			"no_copy": 1,
 			"insert_after": "royce_etims_invoice_number",
 			"depends_on": "eval:doc.royce_etims_status=='Failed'",
 		},
@@ -88,6 +91,7 @@ def _receipt_fields(insert_after):
 			"fieldtype": "Int",
 			"label": "eTIMS Retry Count",
 			"read_only": 1,
+			"no_copy": 1,
 			"hidden": 1,
 			"default": "0",
 			"insert_after": "royce_etims_error",
@@ -110,6 +114,7 @@ def _receipt_fields(insert_after):
 			"fieldtype": "Data",
 			"label": "Receipt Signature (rcptSign)",
 			"read_only": 1,
+			"no_copy": 1,
 			"insert_after": "royce_etims_receipt_section",
 		},
 		{
@@ -117,6 +122,7 @@ def _receipt_fields(insert_after):
 			"fieldtype": "Int",
 			"label": "Current Receipt No (curRcptNo)",
 			"read_only": 1,
+			"no_copy": 1,
 			"insert_after": "royce_etims_receipt_signature",
 		},
 		{
@@ -124,6 +130,7 @@ def _receipt_fields(insert_after):
 			"fieldtype": "Int",
 			"label": "Total Receipt No (totRcptNo)",
 			"read_only": 1,
+			"no_copy": 1,
 			"insert_after": "royce_etims_current_receipt_number",
 		},
 		{
@@ -136,6 +143,7 @@ def _receipt_fields(insert_after):
 			"fieldtype": "Small Text",
 			"label": "Internal Data (intrlData)",
 			"read_only": 1,
+			"no_copy": 1,
 			"insert_after": "royce_etims_receipt_column_break",
 		},
 		{
@@ -143,6 +151,7 @@ def _receipt_fields(insert_after):
 			"fieldtype": "Data",
 			"label": "Control Unit Date/Time (sdcDateTime)",
 			"read_only": 1,
+			"no_copy": 1,
 			"insert_after": "royce_etims_internal_data",
 		},
 		{
@@ -150,6 +159,7 @@ def _receipt_fields(insert_after):
 			"fieldtype": "Small Text",
 			"label": "eTIMS QR Verification URL",
 			"read_only": 1,
+			"no_copy": 1,
 			"insert_after": "royce_etims_control_unit_datetime",
 		},
 		{
@@ -157,6 +167,7 @@ def _receipt_fields(insert_after):
 			"fieldtype": "Small Text",
 			"label": "eTIMS QR Code (data URI)",
 			"read_only": 1,
+			"no_copy": 1,
 			"hidden": 1,
 			"insert_after": "royce_etims_qr_verification_url",
 		},
@@ -166,6 +177,7 @@ def _receipt_fields(insert_after):
 			"label": "eTIMS QR Code",
 			"options": "royce_etims_qr_code",
 			"read_only": 1,
+			"no_copy": 1,
 			"insert_after": "royce_etims_qr_code",
 		},
 	]

@@ -73,6 +73,11 @@ TAX_CODES = ("A", "B", "C", "D", "E")
 
 TRADE_NAME_MAX_LENGTH = 20
 
+# KRA's code list carries 13 refund reasons, but sendSalesTransaction accepts
+# only these on a credit note - CONFIRMED 2026-11-07 on the Go-Live test PIN:
+# reason 13 drew "The value of RfdRsnCd can only be among [01, 02, 03, 04, 05, 06]".
+SALES_REFUND_REASONS = ("01", "02", "03", "04", "05", "06")
+
 
 def _get_tax_rates():
 	"""Live lookup against eTIMS Taxation Type, replacing what used to be a
@@ -149,13 +154,25 @@ def on_submit(doc, method=None):
 			).format(doc.company)
 		)
 
-	if doc.get("is_return") and not doc.get("royce_etims_refund_reason"):
-		frappe.throw(_("Select an eTIMS Refund Reason - KRA requires one on every credit note."))
+	if doc.get("is_return"):
+		validate_refund_reason(doc.get("royce_etims_refund_reason"))
 
 	doc.db_set("royce_etims_branch", branch_name, notify=False)
 	doc.db_set("royce_etims_status", "Pending", notify=False)
 
 	_enqueue_sync(doc.doctype, doc.name)
+
+
+def validate_refund_reason(reason):
+	if not reason:
+		frappe.throw(_("Select an eTIMS Refund Reason - KRA requires one on every credit note."))
+	if reason not in SALES_REFUND_REASONS:
+		frappe.throw(
+			_("KRA accepts only refund reasons {0} on a credit note; {1} would be rejected.").format(
+				", ".join(SALES_REFUND_REASONS), reason
+			),
+			title=_("eTIMS Refund Reason"),
+		)
 
 
 def before_cancel(doc, method=None):

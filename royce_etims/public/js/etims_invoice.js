@@ -3,6 +3,12 @@
 
 // Shared by Sales Invoice and POS Invoice (hooks.py doctype_js).
 const royce_etims_invoice = {
+	setup(frm) {
+		// KRA signs a credit note only with reasons 01-06 (see receipt.SALES_REFUND_REASONS).
+		frm.set_query("royce_etims_refund_reason", () => ({
+			filters: { name: ["in", ["01", "02", "03", "04", "05", "06"]] },
+		}));
+	},
 	refresh(frm) {
 		if (frm.doc.docstatus === 1 && frm.doc.royce_etims_status === "Sent") {
 			frm.add_custom_button(__("View at KRA"), () => {

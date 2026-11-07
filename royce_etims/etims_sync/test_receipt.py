@@ -497,3 +497,27 @@ class IntegrationTestTaxRateMismatchHeal(IntegrationTestCase):
 
 		self.assertIsNone(heal_tax_rate_mismatch("Invoice number already exists."))
 		self.assertIsNone(heal_tax_rate_mismatch(None))
+
+
+class UnitTestCreditNoteAndCopies(IntegrationTestCase):
+	def test_only_refund_reasons_kra_accepts_pass(self):
+		from royce_etims.etims_sync.receipt import validate_refund_reason
+
+		for reason in ("01", "06"):
+			validate_refund_reason(reason)
+		# KRA's code list has 07-13 too, but sendSalesTransaction rejects them.
+		for reason in ("07", "13", None):
+			self.assertRaises(frappe.ValidationError, validate_refund_reason, reason)
+
+	def test_kra_result_fields_are_not_copied(self):
+		from royce_etims.custom_fields import CUSTOM_FIELDS
+
+		fields = {f["fieldname"]: f for f in CUSTOM_FIELDS["Sales Invoice"]}
+		for fieldname in (
+			"royce_etims_status",
+			"royce_etims_invoice_number",
+			"royce_etims_receipt_signature",
+			"royce_etims_qr_code",
+			"royce_etims_qr_verification_url",
+		):
+			self.assertEqual(fields[fieldname].get("no_copy"), 1, fieldname)
