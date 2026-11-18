@@ -1,0 +1,137 @@
+{
+ "actions": [],
+ "creation": "2026-11-18 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "branch",
+  "company",
+  "insurer_code",
+  "column_break_insurer",
+  "insurer_name",
+  "rate",
+  "active",
+  "section_kra",
+  "status",
+  "sent_on",
+  "column_break_kra",
+  "error"
+ ],
+ "fields": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "eTIMS Branch",
+   "options": "eTIMS Branch",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "fetch_from": "branch.company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "insurer_code",
+   "fieldtype": "Data",
+   "label": "Insurer Code",
+   "reqd": 1,
+   "in_list_view": 1,
+   "length": 20,
+   "description": "KRA's isrccCd: the insurance company's code."
+  },
+  {
+   "fieldname": "column_break_insurer",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "insurer_name",
+   "fieldtype": "Data",
+   "label": "Insurer Name",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Percent",
+   "label": "Insurance Rate",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Premium rate KRA records for this insurer (isrcRt)."
+  },
+  {
+   "fieldname": "active",
+   "fieldtype": "Check",
+   "label": "Active",
+   "default": "1"
+  },
+  {
+   "fieldname": "section_kra",
+   "fieldtype": "Section Break",
+   "label": "KRA"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "KRA Status",
+   "options": "Not Sent\nSent\nFailed",
+   "default": "Not Sent",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "sent_on",
+   "fieldtype": "Datetime",
+   "label": "Sent On",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_kra",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "read_only": 1,
+   "no_copy": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-18 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "KRA eTIMS",
+ "name": "eTIMS Branch Insurance",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "ETIMS-INS-.#####",
+ "naming_rule": "Expression",
+ "title_field": "insurer_name",
+ "show_title_field_in_link": 0
+}

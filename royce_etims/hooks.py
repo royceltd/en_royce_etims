@@ -53,6 +53,7 @@ page_js = {"point-of-sale": "public/js/point_of_sale.js"}
 # include js in doctype views
 doctype_js = {
 	"Item": "public/js/item.js",
+	"BOM": "public/js/bom.js",
 	"Sales Invoice": "public/js/etims_invoice.js",
 	"POS Invoice": "public/js/etims_invoice.js",
 }
@@ -191,7 +192,24 @@ doc_events = {
 		],
 	},
 	"Purchase Receipt": _STOCK_EVENTS,
-	"Purchase Invoice": _STOCK_EVENTS,
+	"Purchase Invoice": {
+		"before_submit": "royce_etims.etims_sync.purchase.before_submit",
+		"on_submit": [
+			"royce_etims.etims_sync.stock.on_submit",
+			"royce_etims.etims_sync.purchase.on_submit",
+		],
+		"before_cancel": "royce_etims.etims_sync.purchase.before_cancel",
+		"on_cancel": [
+			"royce_etims.etims_sync.stock.on_cancel",
+			"royce_etims.etims_sync.purchase.on_cancel",
+		],
+		"on_trash": "royce_etims.etims_sync.purchase.on_trash",
+	},
+	"BOM": {
+		"on_submit": "royce_etims.etims_sync.composition.on_submit",
+	},
+	"eTIMS Branch User": {"on_update": "royce_etims.etims_sync.branch_info.on_update"},
+	"eTIMS Branch Insurance": {"on_update": "royce_etims.etims_sync.branch_info.on_update"},
 	"Delivery Note": _STOCK_EVENTS,
 	"Stock Entry": _STOCK_EVENTS,
 	"Stock Reconciliation": _STOCK_EVENTS,
@@ -205,8 +223,11 @@ scheduler_events = {
 		"*/15 * * * *": [
 			"royce_etims.etims_sync.receipt.retry_failed_receipts",
 			"royce_etims.etims_sync.stock.retry_pending_movements",
+			"royce_etims.etims_sync.purchase.retry_failed_confirmations",
 		],
 	},
+	"hourly": ["royce_etims.etims_sync.purchase.fetch_all_companies"],
+	"daily": ["royce_etims.etims_sync.imports.fetch_all_companies"],
 	"weekly": ["royce_etims.etims_sync.reference_data.sync_all_companies"],
 }
 

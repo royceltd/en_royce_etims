@@ -440,6 +440,45 @@ CUSTOM_FIELDS = {
 			"description": "Used for new items in this group (or its sub-groups) that have no category yet.",
 		},
 	],
+	# The eTIMS Purchase (supplier's KRA invoice) this invoice books - submitting
+	# confirms it with KRA. See etims_sync/purchase.py.
+	"Purchase Invoice": [
+		{
+			"fieldname": "royce_etims_purchase",
+			"fieldtype": "Link",
+			"options": "eTIMS Purchase",
+			"label": "eTIMS Purchase",
+			"insert_after": "bill_date",
+			"read_only": 1,
+			"no_copy": 1,
+			"depends_on": "royce_etims_purchase",
+			"description": "The supplier's KRA invoice. Submitting this invoice confirms it with KRA.",
+		},
+	],
+	# Item composition sent to KRA from a default BOM - etims_sync/composition.py.
+	"BOM": [
+		{
+			"fieldname": "royce_etims_composition_status",
+			"fieldtype": "Select",
+			"label": "KRA eTIMS Composition",
+			"options": "\nSent\nFailed",
+			"insert_after": "is_default",
+			"read_only": 1,
+			"no_copy": 1,
+			"allow_on_submit": 1,
+			"depends_on": "royce_etims_composition_status",
+		},
+		{
+			"fieldname": "royce_etims_composition_error",
+			"fieldtype": "Small Text",
+			"label": "KRA eTIMS Composition Error",
+			"insert_after": "royce_etims_composition_status",
+			"read_only": 1,
+			"no_copy": 1,
+			"allow_on_submit": 1,
+			"depends_on": "eval:doc.royce_etims_composition_status=='Failed'",
+		},
+	],
 	"Sales Invoice": _receipt_fields(insert_after="customer_name"),
 	"POS Invoice": _receipt_fields(insert_after="customer_name"),
 }

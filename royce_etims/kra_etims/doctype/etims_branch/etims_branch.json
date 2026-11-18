@@ -19,6 +19,9 @@
   "registered_on",
   "last_invoice_no",
   "last_sar_no",
+  "last_purchase_no",
+  "purchases_fetched_until",
+  "imports_fetched_until",
   "sdc_id",
   "dvc_id",
   "mrc_no"
@@ -104,6 +107,25 @@
    "read_only": 1
   },
   {
+   "fieldname": "last_purchase_no",
+   "fieldtype": "Int",
+   "label": "Last Purchase No",
+   "read_only": 1,
+   "description": "Last purchase number KRA accepted (sendPurchaseTransactionInfo)."
+  },
+  {
+   "fieldname": "purchases_fetched_until",
+   "fieldtype": "Datetime",
+   "label": "Purchases Fetched Until",
+   "read_only": 1
+  },
+  {
+   "fieldname": "imports_fetched_until",
+   "fieldtype": "Datetime",
+   "label": "Imports Fetched Until",
+   "read_only": 1
+  },
+  {
    "description": "Sales/Control Device ID returned alongside cmcKey at registration.",
    "fieldname": "sdc_id",
    "fieldtype": "Data",
@@ -128,7 +150,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-26 12:00:00.000000",
+ "modified": "2026-11-18 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "KRA eTIMS",
  "name": "eTIMS Branch",

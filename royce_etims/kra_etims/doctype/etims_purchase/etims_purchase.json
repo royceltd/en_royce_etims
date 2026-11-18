@@ -1,0 +1,292 @@
+{
+ "actions": [],
+ "creation": "2026-11-18 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "branch",
+  "supplier_name",
+  "supplier_tin",
+  "supplier",
+  "column_break_head",
+  "status",
+  "purchase_invoice",
+  "kra_purchase_no",
+  "section_invoice",
+  "supplier_invoice_no",
+  "supplier_bhf_id",
+  "supplier_sdc_id",
+  "supplier_mrc_no",
+  "column_break_invoice",
+  "sales_date",
+  "receipt_type",
+  "payment_type",
+  "section_items",
+  "items",
+  "section_totals",
+  "total_taxable",
+  "total_tax",
+  "column_break_totals",
+  "total_amount",
+  "section_kra",
+  "error",
+  "retry_count",
+  "column_break_kra",
+  "confirmed_on",
+  "raw"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1,
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "eTIMS Branch",
+   "options": "eTIMS Branch",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "supplier_name",
+   "fieldtype": "Data",
+   "label": "Supplier (KRA)",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "supplier_tin",
+   "fieldtype": "Data",
+   "label": "Supplier PIN",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Supplier",
+   "options": "Supplier",
+   "description": "Found by PIN. Created from KRA's name and PIN if none exists when you make the invoice."
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "New\nReady\nInvoiced\nConfirmed\nRejected\nFailed",
+   "default": "New",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "purchase_invoice",
+   "fieldtype": "Link",
+   "label": "Purchase Invoice",
+   "options": "Purchase Invoice",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "kra_purchase_no",
+   "fieldtype": "Int",
+   "label": "KRA Purchase No",
+   "read_only": 1,
+   "description": "Our purchase number KRA accepted on confirming or rejecting."
+  },
+  {
+   "fieldname": "section_invoice",
+   "fieldtype": "Section Break",
+   "label": "Supplier's Invoice"
+  },
+  {
+   "fieldname": "supplier_invoice_no",
+   "fieldtype": "Int",
+   "label": "Supplier Invoice No",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "supplier_bhf_id",
+   "fieldtype": "Data",
+   "label": "Supplier Branch",
+   "read_only": 1
+  },
+  {
+   "fieldname": "supplier_sdc_id",
+   "fieldtype": "Data",
+   "label": "Supplier SCU ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "supplier_mrc_no",
+   "fieldtype": "Data",
+   "label": "Supplier MRC No",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_invoice",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sales_date",
+   "fieldtype": "Date",
+   "label": "Invoice Date",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "receipt_type",
+   "fieldtype": "Data",
+   "label": "Receipt Type",
+   "read_only": 1,
+   "description": "S invoice, R credit note."
+  },
+  {
+   "fieldname": "payment_type",
+   "fieldtype": "Data",
+   "label": "Payment Type",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_items",
+   "fieldtype": "Section Break",
+   "label": "Items"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "eTIMS Purchase Item"
+  },
+  {
+   "fieldname": "section_totals",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "fieldname": "total_taxable",
+   "fieldtype": "Float",
+   "label": "Total Taxable",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_tax",
+   "fieldtype": "Float",
+   "label": "Total VAT",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_totals",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Float",
+   "label": "Total",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "section_kra",
+   "fieldtype": "Section Break",
+   "label": "KRA",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "read_only": 1
+  },
+  {
+   "fieldname": "retry_count",
+   "fieldtype": "Int",
+   "label": "Retry Count",
+   "read_only": 1,
+   "default": "0"
+  },
+  {
+   "fieldname": "column_break_kra",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "confirmed_on",
+   "fieldtype": "Datetime",
+   "label": "Confirmed On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "raw",
+   "fieldtype": "Code",
+   "label": "KRA Record",
+   "options": "JSON",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-18 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "KRA eTIMS",
+ "name": "eTIMS Purchase",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "write": 1,
+   "print": 1,
+   "export": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase Manager",
+   "write": 1,
+   "print": 1,
+   "export": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "ETIMS-PUR-.#####",
+ "naming_rule": "Expression",
+ "title_field": "supplier_name",
+ "show_title_field_in_link": 0,
+ "in_create": 1,
+ "search_fields": "supplier_name,supplier_tin,supplier_invoice_no"
+}

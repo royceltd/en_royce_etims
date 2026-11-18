@@ -1,0 +1,306 @@
+{
+ "actions": [],
+ "creation": "2026-11-18 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "branch",
+  "item_name",
+  "hs_code",
+  "column_break_head",
+  "status",
+  "item",
+  "section_declaration",
+  "task_code",
+  "declaration_no",
+  "declaration_date",
+  "item_seq",
+  "column_break_declaration",
+  "origin_country",
+  "export_country",
+  "supplier_name",
+  "agent_name",
+  "section_qty",
+  "qty",
+  "qty_unit",
+  "package",
+  "package_unit",
+  "column_break_qty",
+  "invoice_amount",
+  "invoice_currency",
+  "exchange_rate",
+  "gross_weight",
+  "net_weight",
+  "section_kra",
+  "kra_status",
+  "sent_on",
+  "column_break_kra",
+  "error",
+  "raw"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1,
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "eTIMS Branch",
+   "options": "eTIMS Branch",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item (as declared)",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "hs_code",
+   "fieldtype": "Data",
+   "label": "HS Code",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "New\nApproved\nRejected\nFailed",
+   "default": "New",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item",
+   "in_list_view": 1,
+   "description": "Your item this import line is. It must be registered with KRA before you approve."
+  },
+  {
+   "fieldname": "section_declaration",
+   "fieldtype": "Section Break",
+   "label": "Customs Declaration"
+  },
+  {
+   "fieldname": "task_code",
+   "fieldtype": "Data",
+   "label": "Task Code (taskCd)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "declaration_no",
+   "fieldtype": "Data",
+   "label": "Declaration No",
+   "read_only": 1
+  },
+  {
+   "fieldname": "declaration_date",
+   "fieldtype": "Data",
+   "label": "Declaration Date (dclDe)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_seq",
+   "fieldtype": "Int",
+   "label": "Line No (itemSeq)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_declaration",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "origin_country",
+   "fieldtype": "Data",
+   "label": "Origin Country",
+   "read_only": 1
+  },
+  {
+   "fieldname": "export_country",
+   "fieldtype": "Data",
+   "label": "Export Country",
+   "read_only": 1
+  },
+  {
+   "fieldname": "supplier_name",
+   "fieldtype": "Data",
+   "label": "Supplier",
+   "read_only": 1
+  },
+  {
+   "fieldname": "agent_name",
+   "fieldtype": "Data",
+   "label": "Agent",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_qty",
+   "fieldtype": "Section Break",
+   "label": "Quantity and Value"
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "label": "Quantity",
+   "read_only": 1
+  },
+  {
+   "fieldname": "qty_unit",
+   "fieldtype": "Data",
+   "label": "Quantity Unit",
+   "read_only": 1
+  },
+  {
+   "fieldname": "package",
+   "fieldtype": "Float",
+   "label": "Packages",
+   "read_only": 1
+  },
+  {
+   "fieldname": "package_unit",
+   "fieldtype": "Data",
+   "label": "Packaging Unit",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_qty",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "invoice_amount",
+   "fieldtype": "Float",
+   "label": "Invoice Amount (foreign)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "invoice_currency",
+   "fieldtype": "Data",
+   "label": "Invoice Currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "exchange_rate",
+   "fieldtype": "Float",
+   "label": "Exchange Rate",
+   "read_only": 1
+  },
+  {
+   "fieldname": "gross_weight",
+   "fieldtype": "Float",
+   "label": "Gross Weight",
+   "read_only": 1
+  },
+  {
+   "fieldname": "net_weight",
+   "fieldtype": "Float",
+   "label": "Net Weight",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_kra",
+   "fieldtype": "Section Break",
+   "label": "KRA"
+  },
+  {
+   "fieldname": "kra_status",
+   "fieldtype": "Data",
+   "label": "KRA Import Status",
+   "read_only": 1,
+   "description": "1 Unsent, 2 Waiting, 3 Approved, 4 Cancelled."
+  },
+  {
+   "fieldname": "sent_on",
+   "fieldtype": "Datetime",
+   "label": "Sent On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_kra",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "read_only": 1
+  },
+  {
+   "fieldname": "raw",
+   "fieldtype": "Code",
+   "label": "KRA Record",
+   "options": "JSON",
+   "read_only": 1,
+   "collapsible": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-18 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "KRA eTIMS",
+ "name": "eTIMS Imported Item",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager",
+   "write": 1,
+   "print": 1,
+   "export": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "write": 1,
+   "print": 1,
+   "export": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Stock User"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "ETIMS-IMP-.#####",
+ "naming_rule": "Expression",
+ "title_field": "item_name",
+ "show_title_field_in_link": 0,
+ "in_create": 1
+}

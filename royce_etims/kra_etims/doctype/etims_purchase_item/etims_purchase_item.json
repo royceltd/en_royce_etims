@@ -1,0 +1,166 @@
+{
+ "actions": [],
+ "creation": "2026-11-18 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item",
+  "supplier_item_name",
+  "supplier_item_code",
+  "supplier_item_class",
+  "column_break_line",
+  "qty",
+  "price",
+  "supply_amount",
+  "discount_rate",
+  "discount_amount",
+  "column_break_tax",
+  "tax_type",
+  "taxable_amount",
+  "tax_amount",
+  "total_amount",
+  "item_seq",
+  "package_unit",
+  "qty_unit",
+  "package"
+ ],
+ "fields": [
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item",
+   "in_list_view": 1,
+   "columns": 2,
+   "description": "Your item for the supplier's line. Remembered for this supplier's next invoice."
+  },
+  {
+   "fieldname": "supplier_item_name",
+   "fieldtype": "Data",
+   "label": "Supplier's Item",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 3
+  },
+  {
+   "fieldname": "supplier_item_code",
+   "fieldtype": "Data",
+   "label": "Supplier's KRA Item Code",
+   "read_only": 1
+  },
+  {
+   "fieldname": "supplier_item_class",
+   "fieldtype": "Data",
+   "label": "Supplier's KRA Category",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_line",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "label": "Quantity",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "price",
+   "fieldtype": "Float",
+   "label": "Unit Price (VAT incl.)",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "supply_amount",
+   "fieldtype": "Float",
+   "label": "Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "discount_rate",
+   "fieldtype": "Float",
+   "label": "Discount %",
+   "read_only": 1
+  },
+  {
+   "fieldname": "discount_amount",
+   "fieldtype": "Float",
+   "label": "Discount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_tax",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tax_type",
+   "fieldtype": "Data",
+   "label": "Band",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "taxable_amount",
+   "fieldtype": "Float",
+   "label": "Taxable",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tax_amount",
+   "fieldtype": "Float",
+   "label": "VAT",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Float",
+   "label": "Total",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "item_seq",
+   "fieldtype": "Int",
+   "label": "Supplier Line No",
+   "read_only": 1
+  },
+  {
+   "fieldname": "package_unit",
+   "fieldtype": "Data",
+   "label": "Packaging Unit",
+   "read_only": 1
+  },
+  {
+   "fieldname": "qty_unit",
+   "fieldtype": "Data",
+   "label": "Quantity Unit",
+   "read_only": 1
+  },
+  {
+   "fieldname": "package",
+   "fieldtype": "Float",
+   "label": "Packages",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-18 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "KRA eTIMS",
+ "name": "eTIMS Purchase Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "istable": 1
+}

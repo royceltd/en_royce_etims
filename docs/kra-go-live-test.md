@@ -22,30 +22,29 @@ call order) stay in [architecture.md](architecture.md).
 | 1 | OSCU initialization | `initialize` | ✅ eTIMS Branch → Register Device. Device on 00 is already active — see open question 1 |
 | 2 | Look up list of code | `selectCodeList` | ✅ Sync KRA Reference Data |
 | 3 | Look up item classification | `selectItemClass` | ✅ Sync KRA Reference Data |
-| 4 | Look up branch list | `branchList` | ❌ |
-| 5 | Look up notices list | `selectNoticeList` | ❌ |
+| 4 | Look up branch list | `branchList` | ✅ KRA Lookup |
+| 5 | Look up notices list | `selectNoticeList` | ✅ KRA Lookup |
 | 6 | Save customer branch | `branchSendCustomerInfo` | ✅ Customer registration (RC-######## custNo) |
-| 7 | Save branch user account | `branchUserAccount` | ❌ |
-| 8 | Save branch insurances | `branchInsuranceInfo` | ❌ |
-| 9 | Look up product list | `itemInfo` | ✅ used to pick the next item code; not shown to the user |
+| 7 | Save branch user account | `branchUserAccount` | ✅ eTIMS Branch User (2026-11-18) |
+| 8 | Save branch insurances | `branchInsuranceInfo` | ✅ eTIMS Branch Insurance (2026-11-18) |
+| 9 | Look up product list | `itemInfo` | ✅ KRA Lookup; also picks the next item code |
 | 10 | Save item | `saveItem` | ✅ Item → Sync to eTIMS (KE2NTBA0000003 on 00, 2026-10-28) |
-| 11 | Save item composition | `saveItemComposition` | ❌ |
-| 12 | Look up imported item list | `importedItemInfo` | ❌ |
-| 13 | Update imported items | `importedItemConvertedInfo` | ❌ |
-| 14 | Save sales transaction | `sendSalesTransaction` | ✅ invoices (KRA invoices 4, 5 on 00). Credit note built, not yet signed live |
-| 15 | Look up purchases-sales list | `getPurchaseTransactionInfo` | ❌ |
-| 16 | Save purchases information | `sendPurchaseTransactionInfo` | ❌ |
+| 11 | Save item composition | `saveItemComposition` | ✅ default BOM on submit / BOM > Send to KRA eTIMS (2026-11-18) |
+| 12 | Look up imported item list | `importedItemInfo` | ✅ eTIMS Imported Item inbox, daily + Fetch from KRA |
+| 13 | Update imported items | `importedItemConvertedInfo` | ✅ Imported Item > Approve / Reject (2026-11-18) |
+| 14 | Save sales transaction | `sendSalesTransaction` | ✅ invoices and credit notes |
+| 15 | Look up purchases-sales list | `getPurchaseTransactionInfo` | ✅ eTIMS Purchase inbox, hourly + Fetch from KRA |
+| 16 | Save purchases information | `sendPurchaseTransactionInfo` | ✅ confirmed on Purchase Invoice submit; Reject with KRA (2026-11-18) |
 | 17 | Save stock-master information | `save/stockMaster` | ✅ |
-| 18 | Look up stock movement | `selectStockMoveLists` | ❌ |
+| 18 | Look up stock movement | `selectStockMoveLists` | ✅ KRA Lookup |
 | 19 | Save stock in/out | `insert/stockIO` | ✅ |
-| 20 | Look up invoice details | `selectInvoiceDetail` | ❌ |
-| 21 | Look up transaction sales list | `selectSalesTransactions` | ❌ |
-| 22 | Look up customer list | `customerPinInfo` | ❌ |
+| 20 | Look up invoice details | `selectInvoiceDetail` | ✅ KRA Lookup / View at KRA |
+| 21 | Look up transaction sales list | `selectSalesTransactions` | ✅ KRA Lookup |
+| 22 | Look up customer list | `customerPinInfo` | ✅ KRA Lookup |
 | 23 | Look up tax payer info | `selectTaxpayerInfo` | ✅ Test Connection |
 
-**10 built, 13 to build.** Ten of the 13 are lookups (`tin` + `bhfId` + `lastReqDt` in, a list out)
-and are small. The three that need real design are purchases (16), item composition (11) and
-imports (13).
+**All 23 built (2026-11-18)** and rehearsed live on the test PIN: 22/22 rows pass in 30 seconds
+(case 2 covers 3, case 17 covers 19). See "Rehearsal" below.
 
 ## The flow, from deployment to a credit note
 
@@ -173,7 +172,7 @@ Open: suppliers not on eTIMS (`regTyCd "M"`, as in KRA's sample with `spplrTin` 
 rejecting a purchase (`pchsSttsCd` other codes); supplier credit notes; how the purchase list
 pages (`lastReqDt`).
 
-## Purchases feature — PENDING (parked by the founder 2026-10-29)
+## Purchases feature — BUILT 2026-11-18 (design below, parked 2026-10-29; see "All 23 built")
 
 Proposed design, not started:
 1. **eTIMS Purchase inbox** — scheduled + "Fetch from KRA" pull of `getPurchaseTransactionInfo` per
@@ -240,3 +239,49 @@ ACC-SINV-2026-00006 → KRA invoice 10, 8 s after payment). Three gaps found and
   after that it prints with the pending notice and says so.
 - **A POS Profile without a VAT template** charged no VAT, so every sale failed to sign; it now
   can't be saved for a company eTIMS signs for. The cashier is alerted when KRA doesn't sign.
+
+
+## All 23 built - 2026-11-18
+
+**Rehearsal** (`royce_etims/kra_etims/go_live.py`) runs every case in the client's order through the
+same code the desk uses and prints pass/fail and seconds per case. Sandbox companies only:
+
+    bench --site golive.localhost execute royce_etims.kra_etims.go_live.rehearse \
+        --kwargs "{'company': 'KRA Go-Live Test'}"
+
+First full run: **22/22 rows passed in 0.5 min** (new item KE2NTNO0000085, stock sarNo 55, KRA
+invoice 76 + credit note 77, purchase no. 3). Each run makes a new item, a material receipt, a
+sale, a credit note and a BOM, and confirms one waiting purchase - KRA lists only a few (supplier
+invoices 7-10 from the harness on our branch 02), so the purchase case runs out after two more runs.
+
+New pieces:
+- **eTIMS Branch User / eTIMS Branch Insurance** (7, 8): sent on save and by "Send to KRA". The
+  user's KRA `pwd` is random per send and never stored - nobody signs in to KRA's device.
+- **Item composition** (11): from the item's default BOM, one call per component, quantity per ONE
+  finished unit (BOM quantity divides).
+- **eTIMS Imported Item** (12, 13): inbox; pick the Item, Approve (status 3) or Reject (4).
+- **eTIMS Purchase** (15, 16): the design parked on 2026-10-29, built as proposed. Supplier by PIN
+  (created from KRA's name if missing); supplier item -> our Item remembered in ERPNext's own
+  Item > Supplier Items (supplier part no = supplier's KRA code), so the next invoice matches
+  itself; "Create Purchase Invoice" drafts it with KRA's quantities and VAT-inclusive prices on
+  kenyan_accountant's inclusive purchase template; submit refuses if quantities differ or the total
+  is more than 1.00 off KRA's; submitting confirms (02) in a background job, own sequence
+  `eTIMS Branch.last_purchase_no`, 15-min retry; a confirmed purchase's invoice can't be cancelled.
+  "Reject with KRA" sends 04.
+
+Found live today:
+- **Composition needs component stock at KRA**: "Insufficient stock: Item KE2NTKG0000007 does not
+  exist in stock master". Receive components first.
+- **importedItemConvertedInfo needs a remark**: null remark -> "There is an unknown error. Please ask
+  administrator"; the same payload with a remark is accepted (checked both ways).
+- **A rejected purchase still needs OUR item codes**: "Item KE1NTXU1000003 ... does not exist in your
+  inventory". Reject asks for every line to be matched too.
+- **KRA's purchase list has a wrong splyAmt** (8308 for a 9637.24 line) - prices come from qty x prc.
+- **Purchase numbers**: KRA accepted confirmation no. 1 on 2026-11-18 although no. 1 was also
+  accepted on 2026-10-29. Either the sequence restarts or isn't enforced; resync handles both.
+- ERPNext only allows a line an Item Tax Template listed on its Item, so a supplier's zero-rated
+  line on an item set up as exempt books as exempt (same 0 VAT); KRA still gets the supplier's band.
+- `initialize` on an active device answers "This device is installed".
+
+Still open before the real test: open questions 1-3 above (does "This device is installed" pass
+case 1; branch 02 vs 00; what starts a session), and items 2-4 (purchases) of "Purchases - open".
