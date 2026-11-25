@@ -2,8 +2,15 @@
 # For license information, please see license.txt
 
 """Rehearsal for KRA's Go-Live test (Automated App Testing): all 23 cases in
-the order a client goes through them, through the same code the desk buttons
-and hooks use, with pass/fail and timing per case.
+the order a client goes through them, with pass/fail and timing per case.
+
+Each case calls exactly what the desk does: the method behind the button
+(Register Device, Sync KRA Reference Data, Sync to eTIMS, Send to KRA, Send to
+KRA eTIMS on a BOM, Approve, Create Purchase Invoice, the KRA Lookup report),
+or, where the desk just saves or submits, the save/submit itself - signing,
+stock movements and purchase confirmation then run in the background worker
+exactly as for a user, and the rehearsal waits for them. So a worker must be
+running (bench worker).
 
 KRA's clock can't be paused (23 cases inside one hour), so run this on the
 test PIN first; then start KRA's session and run it again.
@@ -19,11 +26,12 @@ See docs/kra-go-live-test.md for the case list and what each one taught us.
 """
 
 import time
+from datetime import datetime
 
 import frappe
 from frappe.utils import add_days, cint, now_datetime, nowdate
 
-from royce_etims.etims_sync import branch_info, composition, customer, imports, purchase, receipt, stock
+from royce_etims.etims_sync import branch_info, composition, imports, purchase
 from royce_etims.etims_sync.item import sync_item
 from royce_etims.etims_sync.reference_data import sync_reference_data
 from royce_etims.utils.api_client import get_settings
@@ -46,17 +54,19 @@ class Rehearsal:
 		self.stamp = now_datetime().strftime("%m%d%H%M%S")
 		self.results = []
 		self.item = None
+		self.part = None
 		self.invoice = None
 
 	# --- running ---------------------------------------------------------
 
 	def case(self, number, title, fn):
 		started = time.monotonic()
+		since = datetime.now()
 		try:
 			detail = fn() or ""
 			outcome = "PASS"
 		except Exception as e:
-			frappe.db.rollback()
+			_rollback_keeping_logs(since)
 			detail = frappe.utils.strip_html(str(e))[:300]
 			outcome = "FAIL"
 		self.results.append((number, title, outcome, str(detail), time.monotonic() - started))
@@ -100,8 +110,14 @@ class Rehearsal:
 	# --- cases -----------------------------------------------------------
 
 	def initialize(self):
-		"""An active device: KRA answers "already installed" or re-issues its
-		keys. Either counts as KRA having answered; a new cmcKey is stored."""
+		"""eTIMS Branch > Register Device for a device not yet registered. An
+		active device has no button (KRA's initialize is sent as the button
+		would): KRA answers "This device is installed" or re-issues its keys."""
+		if self.branch.device_status not in ("Registered", "Active"):
+			result = self.branch.register_device()
+			self.branch.reload()
+			frappe.db.commit()  # nosemgrep
+			return result["message"]
 		try:
 			data = etims_request(
 				self.company,
@@ -139,7 +155,22 @@ class Rehearsal:
 	def save_customer(self):
 		if not self.customer:
 			raise frappe.ValidationError("No customer with a KRA PIN - add one first.")
-		customer.sync_customer(self.customer)
+		# Saving a Customer queues its registration (Customer on_update); the
+		# rehearsal queues the same job directly, since nothing about it changed.
+		frappe.db.set_value("Customer", self.customer, "royce_etims_customer_status", "Not Synced")
+		frappe.enqueue(
+			"royce_etims.etims_sync.customer.sync_customer",
+			queue="short",
+			name=self.customer,
+			job_id=f"royce_etims_customer::{self.customer}",
+			deduplicate=True,
+			enqueue_after_commit=True,
+		)
+		frappe.db.commit()  # nosemgrep
+		_wait(
+			lambda: frappe.db.get_value("Customer", self.customer, "royce_etims_customer_status")
+			!= "Not Synced"
+		)
 		status, error = frappe.db.get_value(
 			"Customer", self.customer, ["royce_etims_customer_status", "royce_etims_customer_error"]
 		)
@@ -157,7 +188,7 @@ class Rehearsal:
 			)
 			name = frappe.get_doc({"doctype": doctype, "branch": self.branch.name, **values}).insert().name
 			frappe.db.commit()  # nosemgrep
-		branch_info.send(doctype, name, raise_on_error=True)
+		branch_info.send_now(doctype, name)  # the "Send to KRA" button
 		return name
 
 	def save_item(self):
@@ -183,8 +214,17 @@ class Rehearsal:
 			}
 		).insert()
 		frappe.db.commit()  # nosemgrep
-		result = sync_item(item.name, self.company)
+		result = sync_item(item.name, self.company)  # the "Sync to eTIMS" button
 		self.item = item.name
+		# A second item to be the composition's component (case 11): KRA wants a
+		# component it holds stock of, and a new test PIN holds none yet.
+		part = frappe.copy_doc(item)
+		part.item_code = part.item_name = f"KRA-PART-{self.stamp}"
+		part.set("royce_etims_id_mapping", [])
+		part.insert()
+		frappe.db.commit()  # nosemgrep
+		sync_item(part.name, self.company)
+		self.part = part.name
 		return result["message"]
 
 	def _warehouse(self):
@@ -200,7 +240,9 @@ class Rehearsal:
 				"stock_entry_type": "Material Receipt",
 				"company": self.company,
 				"items": [
-					{"item_code": self.item, "qty": 20, "basic_rate": 80, "t_warehouse": self._warehouse()}
+					{"item_code": code, "qty": 20, "basic_rate": 80, "t_warehouse": self._warehouse()}
+					for code in (self.item, self.part)
+					if code
 				],
 			}
 		)
@@ -210,19 +252,24 @@ class Rehearsal:
 		return self._send_stock(entry.doctype, entry.name)
 
 	def _send_stock(self, voucher_type, voucher_no):
-		stock.process_branch_queue(self.branch.name)
-		rows = frappe.get_all(
-			"eTIMS Stock Movement",
-			filters={"voucher_type": voucher_type, "voucher_no": voucher_no},
-			fields=["status", "sar_no", "error"],
-		)
+		"""Submitting queued the movements (stock on_submit); wait for the worker."""
+
+		def rows():
+			return frappe.get_all(
+				"eTIMS Stock Movement",
+				filters={"voucher_type": voucher_type, "voucher_no": voucher_no},
+				fields=["status", "sar_no", "error"],
+			)
+
+		_wait(lambda: rows() and all(r.status not in ("Pending",) for r in rows()))
+		rows = rows()
 		if not rows or any(r.status != "Sent" for r in rows):
 			raise frappe.ValidationError(str(rows))
 		return "sarNo " + ", ".join(str(r.sar_no) for r in rows)
 
 	def save_composition(self):
 		self._need_item()
-		components = self._components_with_kra_stock()
+		components = [self.part] if self.part else self._components_with_kra_stock()
 		bom = frappe.get_doc(
 			{
 				"doctype": "BOM",
@@ -236,7 +283,8 @@ class Rehearsal:
 		bom.insert()
 		bom.submit()
 		frappe.db.commit()  # nosemgrep
-		composition.send_bom(bom.name, raise_on_error=True)
+		# Submitting a default BOM queues the send; the button sends at once.
+		composition.send_now(bom.name)  # the "Send to KRA eTIMS" button
 		return f"{bom.name}: {', '.join(components)}"
 
 	def _components_with_kra_stock(self):
@@ -298,7 +346,8 @@ class Rehearsal:
 		si.insert()
 		si.submit()
 		frappe.db.commit()  # nosemgrep
-		receipt.sync_receipt(si.doctype, si.name)
+		# Submitting queued the signing (receipt on_submit); wait for the worker.
+		_wait(lambda: frappe.db.get_value(si.doctype, si.name, "royce_etims_status") in ("Sent", "Failed"))
 		status, number, error = frappe.db.get_value(
 			si.doctype, si.name, ["royce_etims_status", "royce_etims_invoice_number", "royce_etims_error"]
 		)
@@ -349,12 +398,13 @@ class Rehearsal:
 			raise frappe.ValidationError("No supplier invoice waiting at KRA for this PIN.")
 		doc = frappe.get_doc("eTIMS Purchase", name)
 		for row in doc.items:
-			row.item = row.item or self.item
+			row.item = self.item  # registered on this PIN; older mappings may belong to another PIN
 		doc.save()
 		pi = frappe.get_doc("Purchase Invoice", purchase.create_purchase_invoice(name))
 		pi.submit()
 		frappe.db.commit()  # nosemgrep
-		purchase.confirm(name)
+		# Submitting queued the confirmation (purchase on_submit); wait for the worker.
+		_wait(lambda: frappe.db.get_value("eTIMS Purchase", name, "status") in ("Confirmed", "Failed"))
 		doc.reload()
 		if doc.status != "Confirmed":
 			raise frappe.ValidationError(doc.error)
@@ -363,6 +413,35 @@ class Rehearsal:
 	def _need_item(self):
 		if not self.item:
 			raise frappe.ValidationError("Case 10 (save item) didn't pass.")
+
+
+WAIT_SECONDS = 60
+
+
+def _wait(done, timeout=WAIT_SECONDS):
+	"""Poll until `done()` is true, reading fresh data each time. Raises if the
+	background worker hasn't got there in `timeout` seconds."""
+	deadline = time.monotonic() + timeout
+	while time.monotonic() < deadline:
+		frappe.db.commit()  # nosemgrep - end the snapshot so the worker's writes are visible
+		if done():
+			return
+		time.sleep(1)
+	raise frappe.ValidationError(
+		f"Nothing from the background worker after {timeout}s - is `bench worker` running?"
+	)
+
+
+def _rollback_keeping_logs(since):
+	"""Undo a failed case, but keep the eTIMS Log rows its KRA calls wrote: they
+	are the evidence (KRA's responseRefID) for support. Found 2026-11-22, when a
+	plain rollback lost the log of every failed call in the Go-Live session."""
+	logs = frappe.get_all("eTIMS Log", filters={"creation": [">=", since]}, fields=["*"])
+	frappe.db.rollback()
+	for row in logs:
+		row = {k: v for k, v in row.items() if k not in ("name", "idx", "docstatus")}
+		frappe.get_doc({**row, "doctype": "eTIMS Log"}).insert(ignore_permissions=True)
+	frappe.db.commit()  # nosemgrep
 
 
 def rehearse(company, customer=None):

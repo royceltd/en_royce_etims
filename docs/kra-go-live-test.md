@@ -285,3 +285,39 @@ Found live today:
 
 Still open before the real test: open questions 1-3 above (does "This device is installed" pass
 case 1; branch 02 vs 00; what starts a session), and items 2-4 (purchases) of "Purchases - open".
+
+## Go-Live sessions 22 and 25 November 2026 - START HERE NEXT
+
+**Status: 21/23 on the KRA Validation screen (session of 25 Nov). Waiting on KRA (Seth) for sales.**
+
+Rules from KRA (Seth, 2026-11-25): use the Application Test PIN the session shows, **branch 00 only**,
+never our own PIN (P051909825V) and never branch 02. Our calls on branch 00 count on the screen even
+though the session form still showed Branch Id 02 - enter **00** in the form next time.
+
+| Session | GavaConnect app (Apigee App ID) | Test PIN | Result |
+|---|---|---|---|
+| 22 Nov | 36547f88-97fb-4e70-8aa9-5b1e1bfdf4ea (old) | P600005654A | 14/23. 9 endpoints: "Query did not return a unique result: 2 results were returned" (KRA-side duplicate; grew to 3 with each initialize - don't retry initialize on the old app). Report sent to KRA as a PDF. |
+| 25 Nov | **1d07d9cb-640c-4603-bc4b-ee1a1c760a2a (new, Seth's advice)** | **P600005713A** | **21/23.** Device registered on 00 (dvcId 452909, KRACU0400001224, serial 5CD6472Z8WR). |
+
+Still failing on 25 Nov:
+- **Save Sales Transaction (14):** every sendSalesTransaction returns resultCd 999 "There is an unknown
+  error. Please ask administrator", goods or service item, with or without custTin, any field variation.
+  Validation passes (invcNo 2 -> "Invc No: 2 is invalid, use the expected value: 1"). A sale from test PIN
+  P600004665A/00 (etims.localhost, switched to the new app's keys) to P600005713A got the same 999.
+  responseRefIDs 1ffa29ff-01cc-4b97-b4c8-594add89ba39, 934a5cc1-2ff3-4bc4-bdf3-4a0302d37a71,
+  7b02c0ca-7813-4886-95fd-120f609e83e4. Asked Seth to check the sales service for the new app.
+- **Save Purchases Information (16):** needs a sale signed TO P600005713A first; a purchase from a
+  non-eTIMS supplier (regTyCd "M", KRA's own sample) is refused: "You dont have any purchase records for
+  tin P600005713A". Asked Seth for a test sale to P600005713A.
+- Lookup Invoice Details (20) passed with a lookup of invoice 1 (empty result counts).
+
+To finish once KRA fixes sales (golive.localhost is set up: PIN P600005713A, new app, branch 00):
+`bench --site golive.localhost execute royce_etims.kra_etims.go_live.rehearse --kwargs "{'company': 'KRA Go-Live Test'}"`
+needs `bench worker` running (signing, stock and purchase confirmation run in the worker, as for a user).
+Then the uploads: item creation screenshot, invoice generation screenshot, invoice copy, credit note copy.
+
+Changed on 25 Nov: the rehearsal now calls exactly what the desk buttons call and waits for the worker
+for submit-driven steps; a failed case keeps its eTIMS Log rows (a plain rollback lost the 22 Nov
+evidence); Sync to eTIMS no longer fails on a PIN with no items yet (KRA's "no search result" = empty).
+On golive, item codes of earlier test PINs were moved to "KRA Go-Live Test (old test PINs)" and its
+waiting purchases from earlier PINs marked Rejected locally (not at KRA), so a new PIN starts clean.

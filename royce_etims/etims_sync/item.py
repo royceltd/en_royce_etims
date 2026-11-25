@@ -90,6 +90,9 @@ def _kra_item_codes(company, branch):
 		"itemInfo",
 		payload={"tin": settings.tin, "bhfId": branch.bhf_id, "lastReqDt": "20180101000000"},
 		branch=branch,
+		# A PIN with no items yet answers "There is no search result" (resultCd 001):
+		# an empty list, not a failure - FOUND 2026-11-25 on a fresh Go-Live test PIN.
+		allow_empty=True,
 	)
 	body = (data or {}).get("responseBody") or data or {}
 	return [row.get("itemCd") for row in (body.get("data") or {}).get("itemList") or []]
