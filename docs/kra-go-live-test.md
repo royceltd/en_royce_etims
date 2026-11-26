@@ -247,7 +247,11 @@ ACC-SINV-2026-00006 → KRA invoice 10, 8 s after payment). Three gaps found and
 same code the desk uses and prints pass/fail and seconds per case. Sandbox companies only:
 
     bench --site golive.localhost execute royce_etims.kra_etims.go_live.rehearse \
-        --kwargs "{'company': 'KRA Go-Live Test'}"
+        --kwargs "{'company': 'KRA Go-Live Test', 'customer': 'KRA Test PIN P600004665A'}"
+
+The customer must be named and must carry a KRA test PIN, never a real taxpayer's PIN (KRA's rule,
+22 Nov 2026). Until 27 Nov the rehearsal picked any customer with a PIN, so every sale went to the
+founder's own PIN; it now refuses to guess, and refuses the seller's own PIN.
 
 First full run: **22/22 rows passed in 0.5 min** (new item KE2NTNO0000085, stock sarNo 55, KRA
 invoice 76 + credit note 77, purchase no. 3). Each run makes a new item, a material receipt, a
@@ -312,7 +316,8 @@ Still failing on 25 Nov:
 - Lookup Invoice Details (20) passed with a lookup of invoice 1 (empty result counts).
 
 To finish once KRA fixes sales (golive.localhost is set up: PIN P600005713A, new app, branch 00):
-`bench --site golive.localhost execute royce_etims.kra_etims.go_live.rehearse --kwargs "{'company': 'KRA Go-Live Test'}"`
+`bench --site golive.localhost execute royce_etims.kra_etims.go_live.rehearse --kwargs "{'company': 'KRA Go-Live Test', 'customer': 'KRA Test PIN P600004665A'}"`
+(customer = the other test PIN, so a sale that KRA accepts also gives P600004665A a purchase record)
 needs `bench worker` running (signing, stock and purchase confirmation run in the worker, as for a user).
 Then the uploads: item creation screenshot, invoice generation screenshot, invoice copy, credit note copy.
 

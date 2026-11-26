@@ -48,9 +48,9 @@ class Rehearsal:
 		self.company = company
 		self.settings = get_settings(company)
 		self.branch = frappe.get_doc("eTIMS Branch", self.settings.default_branch)
-		self.customer = customer_name or frappe.db.get_value(
-			"Customer", {"tax_id": ["like", "P%"], "disabled": 0}, "name"
-		)
+		# Named, never guessed: KRA (Seth, 22 Nov 2026) allows only the session's
+		# test PINs at the sandbox, never a real taxpayer's PIN.
+		self.customer = customer_name
 		self.stamp = now_datetime().strftime("%m%d%H%M%S")
 		self.results = []
 		self.item = None
@@ -154,7 +154,11 @@ class Rehearsal:
 
 	def save_customer(self):
 		if not self.customer:
-			raise frappe.ValidationError("No customer with a KRA PIN - add one first.")
+			raise frappe.ValidationError(
+				"Name the customer: a Customer whose Tax ID is a KRA test PIN (not a real taxpayer's)."
+			)
+		if frappe.db.get_value("Customer", self.customer, "tax_id") == self.settings.tin:
+			raise frappe.ValidationError("The customer's PIN is the seller's own PIN - use the other test PIN.")
 		# Saving a Customer queues its registration (Customer on_update); the
 		# rehearsal queues the same job directly, since nothing about it changed.
 		frappe.db.set_value("Customer", self.customer, "royce_etims_customer_status", "Not Synced")
