@@ -292,7 +292,22 @@ case 1; branch 02 vs 00; what starts a session), and items 2-4 (purchases) of "P
 
 ## Go-Live sessions 22 and 25 November 2026 - START HERE NEXT
 
-**Status: 21/23 on the KRA Validation screen (session of 25 Nov). Waiting on KRA (Seth) for sales.**
+**Status, 27 Nov: sales and purchases now go through at KRA, so all 23 cases work. Next: check the
+GavaConnect Validation screen shows 23/23 (or run the rehearsal inside a new session, branch 00), then
+the uploads.**
+
+27 Nov, on golive.localhost (P600005713A / 00, new app), each case run on its own:
+- 14 Save sale: `000`, KRA invoice 1 (ACC-SINV-2026-00016), customer "KRA Test PIN P600004665A".
+  Credit note: KRA invoice 2 against 1 (ACC-SINV-2026-00017). 20 and 21 lookups pass.
+- The sale P600004665A -> P600005713A on etims.localhost (ACC-SINV-2026-00012), 999 on 25 Nov, went
+  through unchanged on "Retry eTIMS": KRA invoice 109. So something also changed at KRA.
+- 15 fetched that sale as a purchase; 16 confirmed it: KRA purchase 1 (ACC-PINV-2026-00005).
+  First try failed in our code: KRA names test PIN P600004665A "ROYCE TECHNOLOGIES LIMITED", already a
+  Supplier name on golive (our own PIN). Fixed in 5177b1f: such a supplier is named "NAME - PIN".
+- Until 78c4ed5 every rehearsal sale went to our own PIN (P051909825V) as customer, against KRA's rule.
+  The customer is now a required argument.
+
+25 Nov status: 21/23 on the KRA Validation screen. Sales were waiting on KRA (Seth).
 
 Rules from KRA (Seth, 2026-11-25): use the Application Test PIN the session shows, **branch 00 only**,
 never our own PIN (P051909825V) and never branch 02. Our calls on branch 00 count on the screen even
