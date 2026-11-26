@@ -177,3 +177,19 @@ class IntegrationTestPurchase(IntegrationTestCase):
 		doc = Doc(status="Confirmed", supplier="S", supplier_tin="P1", items=[_line()])
 		purchase.refresh_status(doc)
 		self.assertEqual(doc.status, "Confirmed")
+
+	def test_new_supplier_named_with_pin_when_name_is_taken(self):
+		# KRA registers test PIN P600004665A as ROYCE TECHNOLOGIES LIMITED, a name the
+		# site already had as a Supplier with another PIN (golive, 2026-11-27).
+		taken = {"ROYCE TECHNOLOGIES LIMITED"}
+
+		def exists(doctype, filters):
+			return (filters if isinstance(filters, str) else filters["supplier_name"]) in taken
+
+		with patch("frappe.db.exists", side_effect=exists):
+			self.assertEqual(
+				purchase._free_supplier_name("ROYCE TECHNOLOGIES LIMITED", "P600004665A"),
+				"ROYCE TECHNOLOGIES LIMITED - P600004665A",
+			)
+			self.assertEqual(purchase._free_supplier_name("Maize Millers", "P1"), "Maize Millers")
+			self.assertEqual(purchase._free_supplier_name(None, "P1"), "P1")

@@ -318,7 +318,7 @@ def _create_supplier(doc):
 	supplier = frappe.get_doc(
 		{
 			"doctype": "Supplier",
-			"supplier_name": doc.supplier_name or doc.supplier_tin,
+			"supplier_name": _free_supplier_name(doc.supplier_name, doc.supplier_tin),
 			"tax_id": doc.supplier_tin,
 			"supplier_group": group,
 			"supplier_type": "Company",
@@ -327,6 +327,16 @@ def _create_supplier(doc):
 	)
 	supplier.insert()
 	return supplier.name
+
+
+def _free_supplier_name(name, tin):
+	"""The supplier's KRA name, or "NAME - PIN" when another Supplier already has
+	that name (same name, different PIN - KRA's test PINs share one; so can
+	traders). Suppliers are named by their name, so a clash would fail the insert."""
+	name = name or tin
+	if frappe.db.exists("Supplier", name) or frappe.db.exists("Supplier", {"supplier_name": name}):
+		return f"{name} - {tin}"
+	return name
 
 
 def remember_item(item_code, supplier, supplier_item_code):
