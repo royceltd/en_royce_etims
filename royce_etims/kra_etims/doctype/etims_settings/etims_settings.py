@@ -20,6 +20,32 @@ class eTIMSSettings(Document):
 			align_rounding_with_kra()
 
 	@frappe.whitelist()
+	def activate(self):
+		"""Settings > Activate eTIMS: from now on sales are signed with KRA. Only
+		once the default branch's device is registered - signing needs its cmcKey."""
+		self.check_permission("write")
+		if not self.default_branch:
+			frappe.throw(_("Set a Default Branch first."))
+		device = frappe.db.get_value("eTIMS Branch", self.default_branch, "device_status")
+		if device not in ("Registered", "Active"):
+			frappe.throw(
+				_("Register the device on branch {0} first (eTIMS Branch > Register Device).").format(
+					self.default_branch
+				)
+			)
+		self.status = "Active"
+		self.save()
+		return self.status
+
+	@frappe.whitelist()
+	def disable(self):
+		"""Settings > Disable eTIMS: stop signing; sales are no longer sent to KRA."""
+		self.check_permission("write")
+		self.status = "Disabled"
+		self.save()
+		return self.status
+
+	@frappe.whitelist()
 	def test_connection(self):
 		"""One authenticated round trip through every layer a real call uses -
 		GavaConnect token, apigee_app_id, tin/bhfId/cmcKey - via the read-only

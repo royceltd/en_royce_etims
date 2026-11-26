@@ -197,14 +197,17 @@ def before_cancel(doc, method=None):
 	)
 
 
-def _enqueue_sync(doctype, name):
+def _enqueue_sync(doctype, name, job_suffix=""):
 	"""One queued sync per document at a time - the submit hook, the retry
-	sweep and the Retry button can all ask for the same one."""
+	sweep and the Retry button can all ask for the same one. A job re-queuing
+	its own document passes a suffix: under the same job_id the running job
+	counts as a duplicate and the retry is dropped (FOUND 2026-11-27, a healed
+	tax-rate mismatch on lick.localhost was never retried)."""
 	frappe.enqueue(
 		"royce_etims.etims_sync.receipt.sync_receipt",
 		queue="short",
 		enqueue_after_commit=True,
-		job_id=f"royce_etims_receipt::{doctype}::{name}",
+		job_id=f"royce_etims_receipt::{doctype}::{name}{job_suffix}",
 		deduplicate=True,
 		doctype=doctype,
 		name=name,
@@ -256,7 +259,8 @@ def sync_receipt(doctype, name):
 		)  # the whole message: local checks leave no eTIMS Log
 		doc.db_set("royce_etims_retry_count", (doc.royce_etims_retry_count or 0) + 1, notify=False)
 		if heal_tax_rate_mismatch(str(e)):
-			_enqueue_sync(doctype, name)  # once: a second mismatch on the same band won't heal again
+			# once: a second mismatch on the same band won't heal again
+			_enqueue_sync(doctype, name, job_suffix="::healed")
 		frappe.db.commit()
 		return
 

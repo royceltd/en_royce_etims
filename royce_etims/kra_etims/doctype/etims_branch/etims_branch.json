@@ -69,7 +69,7 @@
    "label": "Device"
   },
   {
-   "description": "Auto-generated if left blank. This is NOT your computer's hardware serial - it's a self-chosen unique identifier (Odoo's own eTIMS integration generates its own the same way: vendor prefix + PIN + sequence). Reusing a real hardware serial risks 'Device Serial Number already used' if it collides with another applicant's.",
+   "description": "Filled in for you if left blank: a unique identifier for this device, not your computer's hardware serial. A hardware serial can clash with another business's device at KRA.",
    "fieldname": "dvc_srl_no",
    "fieldtype": "Data",
    "label": "Device Serial No (dvcSrlNo)"
@@ -150,7 +150,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-18 10:00:00.000000",
+ "modified": "2026-11-27 01:00:01.000000",
  "modified_by": "Administrator",
  "module": "KRA eTIMS",
  "name": "eTIMS Branch",

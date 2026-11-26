@@ -21,6 +21,10 @@
   "sign_pos_invoices",
   "sign_sales_invoices",
   "sync_stock_movements",
+  "item_defaults_section",
+  "default_vat_band",
+  "column_break_item_defaults",
+  "default_item_classification",
   "receipt_section",
   "receipt_trade_name",
   "receipt_address",
@@ -71,7 +75,7 @@
    "options": "eTIMS Branch"
   },
   {
-   "description": "Confirmed 2026-09-10: /initialize rejects with 401 'Unauthorised-Invalid Access Token' without these. From an App created on the GavaConnect developer portal (developer.go.ke) subscribed to the eTIMS OSCU product - a separate step from the eTIMS Taxpayer Portal's Service Request/Integration Token. See docs/architecture.md.",
+   "description": "From the app created on the GavaConnect developer portal (developer.go.ke) and subscribed to eTIMS OSCU. Every call to KRA needs them.",
    "fieldname": "gavaconnect_section",
    "fieldtype": "Section Break",
    "label": "GavaConnect App Credentials"
@@ -91,7 +95,7 @@
    "label": "Consumer Secret"
   },
   {
-   "description": "CONFIRMED required 2026-09-11 by a real saveItem rejection: \"Invalid Headers apigee_app_id\" / \"apigee_app_id cannot be Null\". CONFIRMED NOT the same as Consumer Key - tried twice for real (not a fluke), both times got the identical internal error \"...TestSessionApiLog.getApiNo()... TestSessionApplicationStepDto...is null\" instead of a clean accept/reject, meaning KRA's backend treated the Consumer Key as a lookup key into its own Automated App Testing session tracking and found nothing. Get the real value from the GavaConnect developer portal's My Apps page (or ask KRA support specifically about Automated App Testing) before relying on saveItem/sendSalesTransaction - see docs/architecture.md. Don't re-try the Consumer Key here again.",
+   "description": "The app's Apigee App ID from GavaConnect > My Apps. It is not the Consumer Key.",
    "fieldname": "gavaconnect_app_id",
    "fieldtype": "Data",
    "label": "Apigee App ID"
@@ -123,7 +127,33 @@
    "label": "Sync Stock Movements"
   },
   {
-   "description": "Feeds the nested \"receipt\" object KRA's sendSalesTransaction expects (confirmed real shape: eTIMS-OSCU-Integrator-Automated-Testing-Sandbox.json) - what actually prints on the fiscal receipt, separate from the invoice's own line items.",
+   "fieldname": "item_defaults_section",
+   "fieldtype": "Section Break",
+   "label": "Item Defaults",
+   "collapsible": 0,
+   "description": "Used by Register All Items with KRA for an item that doesn't have its own value. A value on the item always wins."
+  },
+  {
+   "fieldname": "default_vat_band",
+   "fieldtype": "Link",
+   "options": "eTIMS Taxation Type",
+   "label": "Default VAT Band",
+   "default": "B",
+   "description": "For an item with no Item Tax Template. B = VAT 16%."
+  },
+  {
+   "fieldname": "column_break_item_defaults",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "default_item_classification",
+   "fieldtype": "Link",
+   "options": "eTIMS Item Classification",
+   "label": "Default KRA Product Category",
+   "description": "For an item whose Item Group (or a parent group) has no KRA Product Category. Set categories on Item Groups for accuracy."
+  },
+  {
+   "description": "What KRA prints on the fiscal receipt, separate from the invoice lines.",
    "fieldname": "receipt_section",
    "fieldtype": "Section Break",
    "label": "Receipt Branding"
@@ -161,7 +191,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-26 15:00:00.000000",
+ "modified": "2026-11-27 01:00:01.000000",
  "modified_by": "Administrator",
  "module": "KRA eTIMS",
  "name": "eTIMS Settings",

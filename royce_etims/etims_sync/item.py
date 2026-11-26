@@ -168,6 +168,11 @@ def _validate_ready_to_sync(item, company):
 UOM_QUANTITY_UNITS = {
 	"Nos": "NO",
 	"Unit": "NO",
+	"Piece": "NO",  # KRA's Pieces/item is "U", one letter - refused in item codes
+	"Packet": "PA",
+	"Roll": "RO",
+	"Bag": "BG",
+	"Dozen": "DZ",
 	"Kg": "KG",
 	"Box": "BX",
 	"Pair": "PR",
@@ -299,7 +304,11 @@ def _mark_synced(item):
 
 
 @frappe.whitelist()
-def sync_item(item_code, company):
+def sync_item(item_code, company, kra_codes=None):
+	"""Register the item with KRA and declare the stock it already has (KRA
+	won't sign a sale of an item missing from its stock master). `kra_codes`:
+	KRA's itemCd list, passed by a bulk run so it isn't fetched per item; a new
+	code is appended to it."""
 	item = frappe.get_doc("Item", item_code)
 	settings = get_settings(company)
 
@@ -319,7 +328,8 @@ def sync_item(item_code, company):
 	branch = frappe.get_doc("eTIMS Branch", settings.default_branch)
 	item_cd = get_etims_id(item, company)
 	is_new_code = not item_cd
-	kra_codes = _kra_item_codes(company, branch)
+	if kra_codes is None or isinstance(kra_codes, str):
+		kra_codes = _kra_item_codes(company, branch)
 
 	if is_new_code:
 		prefix = item_code_prefix(item)
@@ -330,6 +340,7 @@ def sync_item(item_code, company):
 		# by re-syncing KE2NTBA0000005 a second after registering it. So a
 		# registered item can't be re-sent or updated through saveItem here.
 		_mark_synced(item)
+		declare_opening_stock(item.name, company)
 		return {
 			"success": True,
 			"message": _("Item {0} is already registered with KRA as {1}.").format(item.item_code, item_cd),
@@ -354,10 +365,12 @@ def sync_item(item_code, company):
 	# Recorded only once KRA has accepted it, so a rejected attempt never
 	# leaves a code behind that KRA doesn't know about.
 	if is_new_code:
+		kra_codes.append(item_cd)
 		set_etims_id(item, company, item_cd)
-		item.save()
+		item.save(ignore_permissions=True)
 
 	_mark_synced(item)
+	declare_opening_stock(item.name, company)
 
 	return {
 		"success": True,
@@ -373,3 +386,61 @@ def assign_etims_item_code(item_code, company, etims_id):
 	set_etims_id(item, company, etims_id)
 	item.save()
 	return {"success": True, "message": _("eTIMS Item Code set for {0}.").format(company)}
+
+
+def declare_opening_stock(item_code, company):
+	"""Queue the stock an item holds now as one incoming movement to KRA, once
+	per item. Stock received before the item had its KRA code was never sent
+	(stock.on_submit skips unregistered items), and KRA refuses a sale of an
+	item its stock master doesn't have - FOUND 2026-11-27 on lick.localhost:
+	"Item KE2NTNO0000087 does not exist in your stock master". Returns the
+	movement's name, or None when there's nothing to send."""
+	from royce_etims.etims_sync.stock import SAR_ADJUST_IN, _active_settings, _enqueue_branch, _item_row
+
+	settings = _active_settings(company)
+	if not settings:
+		return None
+	if frappe.db.exists(
+		"eTIMS Stock Movement",
+		{"company": company, "voucher_type": "Item", "voucher_no": item_code, "status": ["!=", "Cancelled"]},
+	):
+		return None
+	qty, value = opening_stock(item_code, company)
+	if qty <= 0:
+		return None
+	row = _item_row(item_code, qty, value, company)
+	if not row:
+		return None
+	movement = frappe.get_doc(
+		{
+			"doctype": "eTIMS Stock Movement",
+			"company": company,
+			"branch": settings.default_branch,
+			"voucher_type": "Item",
+			"voucher_no": item_code,
+			"posting_date": frappe.utils.nowdate(),
+			"direction": "In",
+			"sar_ty_cd": SAR_ADJUST_IN,
+			"items": [row],
+		}
+	).insert(ignore_permissions=True)
+	_enqueue_branch(settings.default_branch)
+	return movement.name
+
+
+def opening_stock(item_code, company):
+	"""(qty, value) on hand across the company's warehouses. Value falls back to
+	the item's valuation rate when the bins carry none."""
+	qty, value = frappe.db.sql(
+		"""
+		SELECT COALESCE(SUM(b.actual_qty), 0), COALESCE(SUM(b.stock_value), 0)
+		FROM `tabBin` b JOIN `tabWarehouse` w ON w.name = b.warehouse
+		WHERE b.item_code = %s AND w.company = %s AND b.actual_qty > 0
+		""",
+		(item_code, company),
+	)[0]
+	qty, value = float(qty), float(value)
+	if qty > 0 and value <= 0:
+		rate = frappe.db.get_value("Item", item_code, "valuation_rate") or 0
+		value = qty * float(rate)
+	return qty, value
