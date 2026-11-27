@@ -319,6 +319,13 @@ def sync_item(item_code, company, kra_codes=None):
 			).format(company)
 		)
 
+	# Empty KRA fields take the same defaults Register All Items uses, so the
+	# single button works on an item saved before eTIMS was set up (FOUND
+	# 2026-11-27: Lick item ELE-0030 refused with six fields "missing").
+	from royce_etims.etims_sync.bulk_items import fill_kra_fields
+
+	if fill_kra_fields(item.name, settings):
+		item.reload()
 	try:
 		_validate_ready_to_sync(item, company)
 	except frappe.ValidationError as e:

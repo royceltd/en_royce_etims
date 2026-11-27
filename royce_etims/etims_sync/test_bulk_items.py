@@ -78,6 +78,7 @@ class IntegrationTestBulkItems(IntegrationTestCase):
 			patch("frappe.get_doc", side_effect=lambda dt, *a, **k: item if dt == "Item" else frappe._dict(bhf_id="00")),
 			patch("royce_etims.etims_sync.item.get_settings", return_value=frappe._dict(default_branch="C-00")),
 			patch("royce_etims.etims_sync.item._validate_ready_to_sync"),
+			patch("royce_etims.etims_sync.bulk_items.fill_kra_fields", return_value={}),
 			patch("royce_etims.etims_sync.item._known_item_codes", side_effect=lambda c, codes: codes + ["KE2NTNO0000124"]),
 			patch("royce_etims.etims_sync.item.item_code_prefix", return_value="KE2NTNO"),
 			patch("royce_etims.etims_sync.item.build_item_payload", side_effect=lambda i, cd: {"itemCd": cd}),
