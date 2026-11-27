@@ -76,7 +76,7 @@
 <tr><td>Sign POS Invoices / Sign Sales Invoices</td><td>Tick both, so till sales and invoices are both sent to KRA.</td></tr>
 <tr><td>Sync Stock Movements</td><td>Tick it. KRA refuses a sale of an item it has no stock record for.</td></tr>
 <tr><td>Default VAT Band</td><td><b>B</b> (VAT 16%) unless your accountant says otherwise. It applies only to items with no Item Tax Template.</td></tr>
-<tr><td>Default KRA Product Category</td><td>The KRA category that fits most of what you sell. Items whose Item Group has its own KRA category use that one instead.</td></tr>
+<tr><td>Default KRA Product Category</td><td>The KRA category that fits most of what you sell. Items whose Item Group has its own KRA category use that one instead. <b>Leave it empty for now</b>: the list comes from KRA, so you fill it in after Sync KRA Reference Data (section 4).</td></tr>
 <tr><td>Receipt Trade Name, Address, Top/Bottom Message</td><td>What KRA prints on the fiscal receipt, for example your trading name and a "Goods once sold..." line.</td></tr>
 </table>
 <figure><img src="/assets/royce_etims/guide/img/04-settings-top.webp" alt="eTIMS Settings"><figcaption>eTIMS Settings (the keys are blurred in this picture).</figcaption></figure>
@@ -86,6 +86,7 @@
 <ol>
 <li>Click <span class="btnname">Test Connection</span>. KRA should recognise your branch and show your business name.</li>
 <li>Click <span class="btnname">Sync KRA Reference Data</span>. This downloads KRA's lists: VAT bands, units, packaging, countries, product categories and credit-note reasons. It also runs every week by itself.</li>
+<li>Set <b>Default KRA Product Category</b> (type a word to search KRA's list) and Save.</li>
 <li>Click <span class="btnname">Activate eTIMS</span> and confirm. From now on every sale is sent to KRA.</li>
 </ol>
 <figure><img src="/assets/royce_etims/guide/img/06-test-connection.webp" alt="Test connection"><figcaption>Test Connection: KRA recognises the branch.</figcaption></figure>
@@ -103,14 +104,15 @@
 <li>registers the item with KRA;</li>
 <li>tells KRA how much stock you hold of it, so it can be sold straight away.</li>
 </ul>
-<p>When it finishes, a summary appears in the comments at the bottom of eTIMS Settings, listing any items KRA didn't accept and why.</p>
+<p>When it finishes, a summary appears in the Activity at the bottom of eTIMS Settings, listing any items KRA didn't accept and why.</p>
 <figure><img src="/assets/royce_etims/guide/img/10-register-all-confirm.webp" alt="Register all items"><figcaption>Register All Items with KRA.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/10b-register-all-summary.webp" alt="Registration summary"><figcaption>The summary: 6 items registered, 1 refused (an item sold by the metre) with the reason.</figcaption></figure>
 <h3>One item</h3>
 <p>Open the item, check its <b>KRA eTIMS</b> tab, and click <span class="btnname">Sync to eTIMS</span>. Do this for every new item before you sell it.</p>
-<figure><img src="/assets/royce_etims/guide/img/11-item-etims-tab.webp" alt="Item KRA eTIMS tab"><figcaption>A registered item: KRA fields filled in, status Synced, and its KRA item code.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/11-item-etims-tab.webp" alt="Item KRA eTIMS tab"><figcaption>A registered item: status Synced, its KRA item code, and the KRA fields filled in.</figcaption></figure>
 <h3>Units KRA doesn't accept</h3>
 <p>KRA's item codes need a two-letter quantity unit. Pieces (NO), packets (PA), rolls (RO), bags (BG), boxes (BX), pairs (PR), dozens (DZ) and kilograms (KG) work. Metres, litres and feet have no two-letter KRA code, so items sold in those units are refused with "KRA only accepts item codes with a 2-letter quantity unit". Agree with your accountant which unit to use (for example NO or RO), set it in the item's KRA eTIMS tab, and click Sync to eTIMS again.</p>
-<figure><img src="/assets/royce_etims/guide/img/12-item-not-registered.webp" alt="Item not registered"><figcaption>An item KRA hasn't accepted, with the reason.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/12-item-not-registered.webp" alt="Item not registered"><figcaption>An item sold by the metre, not registered, with the reason.</figcaption></figure>
 
 <h2 id="stock">6. Stock and KRA</h2>
 <p>With Sync Stock Movements ticked, stock coming in or going out is sent to KRA by itself: purchase receipts, stock entries, stock reconciliations and the stock part of sales. You don't need to do anything. Each one appears under <b>KRA eTIMS &gt; Stock Movements</b> with its status.</p>
@@ -126,7 +128,7 @@
 <li>Print or email it. The <b>Kenya Tax Invoice</b> print shows KRA's CU invoice number, CU ID, signature and QR code.</li>
 </ol>
 <figure><img src="/assets/royce_etims/guide/img/14-invoice-draft.webp" alt="Sales invoice draft"><figcaption>A new Sales Invoice.</figcaption></figure>
-<figure><img src="/assets/royce_etims/guide/img/15-invoice-vat.webp" alt="VAT on the invoice"><figcaption>One VAT row, from the company's default VAT template.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/15-invoice-vat.webp" alt="VAT on the invoice"><figcaption>One Output VAT row, from the company's default VAT template.</figcaption></figure>
 <figure><img src="/assets/royce_etims/guide/img/17-invoice-etims-signed.webp" alt="Signed by KRA"><figcaption>After submitting: eTIMS Status Sent.</figcaption></figure>
 <figure><img src="/assets/royce_etims/guide/img/18-invoice-print.webp" alt="Printed invoice with KRA QR"><figcaption>The printed invoice, with KRA's details and QR code.</figcaption></figure>
 <div class="note">A submitted invoice can't be edited or cancelled once KRA has signed it. To correct a sale, issue a credit note (section 9).</div>
@@ -186,7 +188,7 @@
 </table>
 <figure><img src="/assets/royce_etims/guide/img/28-etims-compliance-status.webp" alt="Compliance status"><figcaption>Compliance Status.</figcaption></figure>
 <figure><img src="/assets/royce_etims/guide/img/29-etims-vat-summary.webp" alt="VAT summary"><figcaption>VAT Summary by KRA band.</figcaption></figure>
-<figure><img src="/assets/royce_etims/guide/img/30-kra-lookup.webp" alt="KRA lookup"><figcaption>KRA Lookup: the items KRA holds for your PIN.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/30-kra-lookup.webp" alt="KRA lookup"><figcaption>KRA Lookup: the branches KRA holds for your PIN. Choose Items, Notices, Sales or Stock in the second box.</figcaption></figure>
 
 <h2 id="daily">13. Daily checklist</h2>
 <ul>
