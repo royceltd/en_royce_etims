@@ -7,8 +7,24 @@
    "child": 0,
    "collapsible": 1,
    "doctype": "Sidebar Item",
+   "icon": "chart-column",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Dashboard",
+   "link_to": "KRA eTIMS",
+   "link_type": "Dashboard",
+   "parentfield": "items",
+   "parenttype": "Sidebar",
+   "show_arrow": 0,
+   "type": "Link",
+   "idx": 1
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "doctype": "Sidebar Item",
    "icon": "settings",
-   "idx": 1,
+   "idx": 2,
    "indent": 0,
    "keep_closed": 0,
    "label": "Settings",
@@ -24,7 +40,7 @@
    "collapsible": 1,
    "doctype": "Sidebar Item",
    "icon": "house",
-   "idx": 2,
+   "idx": 3,
    "indent": 0,
    "keep_closed": 0,
    "label": "Branches",
@@ -49,7 +65,7 @@
    "parenttype": "Sidebar",
    "show_arrow": 0,
    "type": "Link",
-   "idx": 3
+   "idx": 4
   },
   {
    "child": 0,
@@ -65,7 +81,7 @@
    "parenttype": "Sidebar",
    "show_arrow": 0,
    "type": "Link",
-   "idx": 4
+   "idx": 5
   },
   {
    "child": 0,
@@ -80,7 +96,7 @@
    "parenttype": "Sidebar",
    "show_arrow": 0,
    "type": "Section Break",
-   "idx": 5
+   "idx": 6
   },
   {
    "child": 1,
@@ -96,7 +112,7 @@
    "parenttype": "Sidebar",
    "show_arrow": 0,
    "type": "Link",
-   "idx": 6
+   "idx": 7
   },
   {
    "child": 1,
@@ -112,7 +128,7 @@
    "parenttype": "Sidebar",
    "show_arrow": 0,
    "type": "Link",
-   "idx": 7
+   "idx": 8
   },
   {
    "child": 0,
@@ -127,7 +143,7 @@
    "parenttype": "Sidebar",
    "show_arrow": 0,
    "type": "Section Break",
-   "idx": 8
+   "idx": 9
   },
   {
    "child": 1,
@@ -143,7 +159,7 @@
    "parenttype": "Sidebar",
    "show_arrow": 0,
    "type": "Link",
-   "idx": 9
+   "idx": 10
   },
   {
    "child": 1,
@@ -159,7 +175,7 @@
    "parenttype": "Sidebar",
    "show_arrow": 0,
    "type": "Link",
-   "idx": 10
+   "idx": 11
   },
   {
    "child": 1,
@@ -175,7 +191,7 @@
    "parenttype": "Sidebar",
    "show_arrow": 0,
    "type": "Link",
-   "idx": 11
+   "idx": 12
   },
   {
    "child": 1,
@@ -191,14 +207,14 @@
    "parenttype": "Sidebar",
    "show_arrow": 0,
    "type": "Link",
-   "idx": 12
+   "idx": 13
   },
   {
    "child": 0,
    "collapsible": 1,
    "doctype": "Sidebar Item",
    "icon": "scroll-text",
-   "idx": 13,
+   "idx": 14,
    "indent": 0,
    "keep_closed": 0,
    "label": "eTIMS Log",
@@ -214,7 +230,7 @@
    "collapsible": 1,
    "doctype": "Sidebar Item",
    "icon": "coins",
-   "idx": 14,
+   "idx": 15,
    "indent": 0,
    "keep_closed": 0,
    "label": "Taxation Types",
@@ -230,7 +246,7 @@
    "collapsible": 1,
    "doctype": "Sidebar Item",
    "icon": "package",
-   "idx": 15,
+   "idx": 16,
    "indent": 0,
    "keep_closed": 0,
    "label": "Item Types",
@@ -246,7 +262,7 @@
    "collapsible": 1,
    "doctype": "Sidebar Item",
    "icon": "table",
-   "idx": 16,
+   "idx": 17,
    "indent": 0,
    "keep_closed": 0,
    "label": "Item Classifications",
@@ -262,7 +278,7 @@
    "collapsible": 1,
    "doctype": "Sidebar Item",
    "icon": "package-check",
-   "idx": 17,
+   "idx": 18,
    "indent": 0,
    "keep_closed": 0,
    "label": "Packaging Units",
@@ -278,7 +294,7 @@
    "collapsible": 1,
    "doctype": "Sidebar Item",
    "icon": "list-checks",
-   "idx": 18,
+   "idx": 19,
    "indent": 0,
    "keep_closed": 0,
    "label": "Quantity Units",
@@ -294,7 +310,7 @@
    "collapsible": 1,
    "doctype": "Sidebar Item",
    "icon": "flag",
-   "idx": 19,
+   "idx": 20,
    "indent": 0,
    "keep_closed": 0,
    "label": "Countries of Origin",
@@ -319,7 +335,7 @@
    "parenttype": "Sidebar",
    "show_arrow": 0,
    "type": "Link",
-   "idx": 20
+   "idx": 21
   }
  ],
  "module": "KRA eTIMS",
