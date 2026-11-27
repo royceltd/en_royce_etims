@@ -1,0 +1,198 @@
+<div class="etg">
+<style>
+.etg { max-width: 920px; margin: 0 auto; padding: 8px 4px 48px; line-height: 1.6; color: var(--text-color); }
+.etg h1 { font-size: 1.6rem; margin: 0 0 4px; }
+.etg h2 { font-size: 1.25rem; margin: 40px 0 8px; padding-top: 16px; border-top: 1px solid var(--border-color); }
+.etg h3 { font-size: 1.05rem; margin: 24px 0 6px; }
+.etg p, .etg li { font-size: 0.95rem; }
+.etg .lead { color: var(--text-muted); font-size: 1rem; }
+.etg figure { margin: 12px 0 20px; }
+.etg figure img { width: 100%; border: 1px solid var(--border-color); border-radius: 8px; }
+.etg figure.narrow img { max-width: 420px; }
+.etg figcaption { color: var(--text-muted); font-size: 0.85rem; margin-top: 4px; }
+.etg .note { background: var(--subtle-fg); border-left: 3px solid var(--primary); padding: 10px 14px; border-radius: 6px; margin: 12px 0; }
+.etg .warn { border-left-color: var(--orange-500, #f59e0b); }
+.etg table { width: 100%; border-collapse: collapse; margin: 10px 0 18px; font-size: 0.9rem; }
+.etg th, .etg td { border: 1px solid var(--border-color); padding: 8px 10px; vertical-align: top; text-align: left; }
+.etg th { background: var(--subtle-fg); }
+.etg .toc { columns: 2; padding-left: 18px; }
+.etg kbd, .etg .btnname { background: var(--subtle-fg); border: 1px solid var(--border-color); border-radius: 4px; padding: 0 6px; font-size: 0.85rem; white-space: nowrap; }
+@media (max-width: 640px) { .etg .toc { columns: 1; } }
+</style>
+
+<h1>eTIMS User Guide</h1>
+<p class="lead">How to set up KRA eTIMS, register your items, and sell with KRA-signed invoices and till receipts. Every sale you submit is sent to KRA in the background, and KRA's signature, CU invoice number and QR code are printed on the invoice or receipt.</p>
+
+<div class="note">The screenshots come from a test system connected to KRA's sandbox, so they show a test KRA PIN and test product categories. Your own system shows your PIN and KRA's full lists.</div>
+
+<ol class="toc">
+<li><a href="#before">Before you start</a></li>
+<li><a href="#branch">Add your KRA branch</a></li>
+<li><a href="#settings">eTIMS Settings</a></li>
+<li><a href="#activate">Check the connection and activate</a></li>
+<li><a href="#items">Register your items</a></li>
+<li><a href="#stock">Stock and KRA</a></li>
+<li><a href="#invoice">Sell with a Sales Invoice</a></li>
+<li><a href="#pos">Sell at the till (POS)</a></li>
+<li><a href="#credit">Credit notes (returns)</a></li>
+<li><a href="#failed">When KRA hasn't signed a sale</a></li>
+<li><a href="#purchases">Purchases from eTIMS suppliers</a></li>
+<li><a href="#reports">Dashboard and reports</a></li>
+<li><a href="#daily">Daily checklist</a></li>
+</ol>
+
+<h2 id="before">1. Before you start</h2>
+<p>eTIMS is set up once per company, usually by your ERP support team together with your accountant. You need:</p>
+<ul>
+<li><b>Your company's KRA PIN.</b></li>
+<li><b>Your KRA branch ID.</b> Your head office is branch <b>00</b>. Other shops registered with KRA have their own IDs (01, 02, ...). Use only branches KRA has registered for your PIN.</li>
+<li><b>Your GavaConnect app keys</b> (Consumer Key, Consumer Secret and Apigee App ID). KRA issues these once your integration is approved. Type them into eTIMS Settings yourself, and don't send them by email or chat.</li>
+<li><b>A role that can change settings</b> (System Manager or Accounts Manager) for sections 2 to 5. Cashiers only need sections 8 and 10.</li>
+</ul>
+<p>Everything is under <b>KRA eTIMS</b> in the left-hand sidebar. The sidebar opens on the eTIMS <b>Dashboard</b>.</p>
+<figure><img src="/assets/royce_etims/guide/img/01-dashboard.webp" alt="KRA eTIMS dashboard"><figcaption>The KRA eTIMS dashboard: sales KRA signed today, sales still waiting for KRA, VAT signed this month, items and stock not yet at KRA.</figcaption></figure>
+
+<h2 id="branch">2. Add your KRA branch</h2>
+<p>Open <b>KRA eTIMS &gt; Branches</b> and click <span class="btnname">+ Add eTIMS Branch</span>.</p>
+<ol>
+<li><b>Company</b>: your company.</li>
+<li><b>Branch</b>: the ERPNext branch (the shop or office).</li>
+<li><b>Branch ID (bhfId)</b>: the ID KRA gave this branch, for example <b>00</b> for head office.</li>
+<li>Leave <b>Device Serial No</b> empty. It's filled in for you.</li>
+<li>Save, then click <span class="btnname">Register Device</span> and confirm. KRA registers the device and returns its keys. The branch then shows <b>Device Status: Registered</b> (or Active) and its CU ID.</li>
+</ol>
+<figure><img src="/assets/royce_etims/guide/img/02-branch-new.webp" alt="New eTIMS branch"><figcaption>A new branch before saving.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/03-branch-registered.webp" alt="Registered eTIMS branch"><figcaption>A registered branch, with its device details from KRA.</figcaption></figure>
+<div class="note warn">Register a device once. If registration fails, don't keep clicking: note the message and contact your support team.</div>
+
+<h2 id="settings">3. eTIMS Settings</h2>
+<p>Open <b>KRA eTIMS &gt; Settings</b> and add one for your company:</p>
+<table>
+<tr><th>Field</th><th>What to enter</th></tr>
+<tr><td>TIN (KRA PIN)</td><td>Your company's KRA PIN.</td></tr>
+<tr><td>Environment</td><td><b>Production</b> for real sales. (Sandbox is KRA's test system.)</td></tr>
+<tr><td>Default Branch</td><td>The branch from section 2, usually your head office.</td></tr>
+<tr><td>Consumer Key, Consumer Secret, Apigee App ID</td><td>Your GavaConnect app keys.</td></tr>
+<tr><td>Sign POS Invoices / Sign Sales Invoices</td><td>Tick both, so till sales and invoices are both sent to KRA.</td></tr>
+<tr><td>Sync Stock Movements</td><td>Tick it. KRA refuses a sale of an item it has no stock record for.</td></tr>
+<tr><td>Default VAT Band</td><td><b>B</b> (VAT 16%) unless your accountant says otherwise. It applies only to items with no Item Tax Template.</td></tr>
+<tr><td>Default KRA Product Category</td><td>The KRA category that fits most of what you sell. Items whose Item Group has its own KRA category use that one instead.</td></tr>
+<tr><td>Receipt Trade Name, Address, Top/Bottom Message</td><td>What KRA prints on the fiscal receipt, for example your trading name and a "Goods once sold..." line.</td></tr>
+</table>
+<figure><img src="/assets/royce_etims/guide/img/04-settings-top.webp" alt="eTIMS Settings"><figcaption>eTIMS Settings (the keys are blurred in this picture).</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/05-settings-signing-defaults.webp" alt="What to sign and item defaults"><figcaption>What to sign, and the item defaults used when registering items.</figcaption></figure>
+
+<h2 id="activate">4. Check the connection and activate</h2>
+<ol>
+<li>Click <span class="btnname">Test Connection</span>. KRA should recognise your branch and show your business name.</li>
+<li>Click <span class="btnname">Sync KRA Reference Data</span>. This downloads KRA's lists: VAT bands, units, packaging, countries, product categories and credit-note reasons. It also runs every week by itself.</li>
+<li>Click <span class="btnname">Activate eTIMS</span> and confirm. From now on every sale is sent to KRA.</li>
+</ol>
+<figure><img src="/assets/royce_etims/guide/img/06-test-connection.webp" alt="Test connection"><figcaption>Test Connection: KRA recognises the branch.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/07-reference-data.webp" alt="KRA reference data synced"><figcaption>KRA's lists downloaded.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/08-activate-confirm.webp" alt="Activate eTIMS"><figcaption>Activating eTIMS.</figcaption></figure>
+<div class="note">Activating switches the whole system to <b>Commercial Rounding</b> (half a cent rounds up), the way KRA rounds. Without it, an invoice can differ from KRA by a cent and KRA refuses it.</div>
+<p><span class="btnname">Disable eTIMS</span> stops sending sales to KRA. Use it only on your support team's or KRA's advice.</p>
+
+<h2 id="items">5. Register your items</h2>
+<p>KRA signs a sale only if every item on it is registered with KRA under a KRA item code (for example <b>KE2NTNO0000088</b>).</p>
+<h3>All items at once</h3>
+<p>On eTIMS Settings, click <span class="btnname">Register All Items with KRA</span> and confirm. It runs in the background: about 1,000 items take 15 to 20 minutes, and you can keep working. For each item it:</p>
+<ul>
+<li>fills empty KRA fields: product category, item type, VAT band, country of origin, packaging and quantity unit. It uses what ERPNext already knows, then the Item Defaults from section 3, and never changes a value already on the item;</li>
+<li>registers the item with KRA;</li>
+<li>tells KRA how much stock you hold of it, so it can be sold straight away.</li>
+</ul>
+<p>When it finishes, a summary appears in the comments at the bottom of eTIMS Settings, listing any items KRA didn't accept and why.</p>
+<figure><img src="/assets/royce_etims/guide/img/10-register-all-confirm.webp" alt="Register all items"><figcaption>Register All Items with KRA.</figcaption></figure>
+<h3>One item</h3>
+<p>Open the item, check its <b>KRA eTIMS</b> tab, and click <span class="btnname">Sync to eTIMS</span>. Do this for every new item before you sell it.</p>
+<figure><img src="/assets/royce_etims/guide/img/11-item-etims-tab.webp" alt="Item KRA eTIMS tab"><figcaption>A registered item: KRA fields filled in, status Synced, and its KRA item code.</figcaption></figure>
+<h3>Units KRA doesn't accept</h3>
+<p>KRA's item codes need a two-letter quantity unit. Pieces (NO), packets (PA), rolls (RO), bags (BG), boxes (BX), pairs (PR), dozens (DZ) and kilograms (KG) work. Metres, litres and feet have no two-letter KRA code, so items sold in those units are refused with "KRA only accepts item codes with a 2-letter quantity unit". Agree with your accountant which unit to use (for example NO or RO), set it in the item's KRA eTIMS tab, and click Sync to eTIMS again.</p>
+<figure><img src="/assets/royce_etims/guide/img/12-item-not-registered.webp" alt="Item not registered"><figcaption>An item KRA hasn't accepted, with the reason.</figcaption></figure>
+
+<h2 id="stock">6. Stock and KRA</h2>
+<p>With Sync Stock Movements ticked, stock coming in or going out is sent to KRA by itself: purchase receipts, stock entries, stock reconciliations and the stock part of sales. You don't need to do anything. Each one appears under <b>KRA eTIMS &gt; Stock Movements</b> with its status.</p>
+<figure><img src="/assets/royce_etims/guide/img/13-stock-movements.webp" alt="Stock movements"><figcaption>Stock movements sent to KRA.</figcaption></figure>
+<p>If one shows <b>Failed</b>, open it to read KRA's reason. Movements go to KRA in order, so one failure holds back the ones after it until it's fixed. Ask your support team if the reason isn't clear.</p>
+
+<h2 id="invoice">7. Sell with a Sales Invoice</h2>
+<ol>
+<li>Create the Sales Invoice as usual: customer, items, quantities. If the customer has a KRA PIN, set it as the customer's Tax ID, so KRA records the sale against their PIN.</li>
+<li>Check the VAT under <b>Taxes and Charges</b>. There should be one Output VAT row.</li>
+<li>Save and <b>Submit</b>.</li>
+<li>Within a few seconds the <b>eTIMS Status</b> changes from Pending to <b>Sent</b>, and the eTIMS Receipt section shows KRA's signature. The <span class="btnname">View at KRA</span> button opens KRA's own record of the sale.</li>
+<li>Print or email it. The <b>Kenya Tax Invoice</b> print shows KRA's CU invoice number, CU ID, signature and QR code.</li>
+</ol>
+<figure><img src="/assets/royce_etims/guide/img/14-invoice-draft.webp" alt="Sales invoice draft"><figcaption>A new Sales Invoice.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/15-invoice-vat.webp" alt="VAT on the invoice"><figcaption>One VAT row, from the company's default VAT template.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/17-invoice-etims-signed.webp" alt="Signed by KRA"><figcaption>After submitting: eTIMS Status Sent.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/18-invoice-print.webp" alt="Printed invoice with KRA QR"><figcaption>The printed invoice, with KRA's details and QR code.</figcaption></figure>
+<div class="note">A submitted invoice can't be edited or cancelled once KRA has signed it. To correct a sale, issue a credit note (section 9).</div>
+
+<h2 id="pos">8. Sell at the till (POS)</h2>
+<h3>Once per till</h3>
+<p>Open the till's <b>POS Profile</b> and set <b>Print Format</b> to <b>Kenya POS Receipt</b>. That receipt carries KRA's details and QR code. A receipt layout of your own won't show them.</p>
+<figure><img src="/assets/royce_etims/guide/img/23-pos-profile-print-format.webp" alt="POS profile print format"><figcaption>POS Profile: Print Format = Kenya POS Receipt.</figcaption></figure>
+<h3>Every sale</h3>
+<ol>
+<li>Open the till (Point of Sale) as usual and add the items.</li>
+<li>Click <b>Checkout</b>, choose the payment method (cash or M-Pesa), and <b>Complete Order</b>.</li>
+<li>The sale goes to KRA straight away. Click <b>Print Receipt</b>: the till waits a few seconds for KRA's signature, then prints the receipt with the QR code.</li>
+</ol>
+<figure><img src="/assets/royce_etims/guide/img/24-pos-cart.webp" alt="Till cart"><figcaption>Items in the cart. VAT is included in the price.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/25-pos-payment.webp" alt="Till payment"><figcaption>Choosing the payment method.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/26-pos-complete.webp" alt="Order complete"><figcaption>Order complete: Print Receipt.</figcaption></figure>
+<figure class="narrow"><img src="/assets/royce_etims/guide/img/27-pos-receipt.webp" alt="Till receipt with KRA QR"><figcaption>The till receipt: KRA eTIMS section with CU invoice number and QR code.</figcaption></figure>
+<div class="note warn">If the receipt says <b>"KRA signature pending"</b>, KRA hadn't answered yet. The sale is still sent. Reprint it a minute later from <b>Recent Orders</b> so the customer gets the QR code.</div>
+
+<h2 id="credit">9. Credit notes (returns)</h2>
+<ol>
+<li>Open the signed Sales Invoice and click <b>Create &gt; Return / Credit Note</b>.</li>
+<li>Adjust the quantities returned (they show as negative numbers).</li>
+<li>Choose the <b>eTIMS Refund Reason</b>, for example 06 Refund, 03 Damaged or 09 Wrong Amount/price. KRA requires one.</li>
+<li>Save and Submit. ERPNext may show a note about "Update Outstanding for Self"; close it. The credit note goes to KRA and is signed like an invoice.</li>
+</ol>
+<figure><img src="/assets/royce_etims/guide/img/19-credit-note-reason.webp" alt="Credit note refund reason"><figcaption>A credit note with its KRA refund reason.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/20-credit-note-signed.webp" alt="Credit note signed"><figcaption>The credit note signed by KRA.</figcaption></figure>
+
+<h2 id="failed">10. When KRA hasn't signed a sale</h2>
+<p>A sale that KRA hasn't signed shows <b>eTIMS Status: Failed</b> with KRA's reason underneath. The system retries every 15 minutes by itself. Once you've fixed the cause, click <span class="btnname">Retry eTIMS</span> on the invoice to send it straight away.</p>
+<figure><img src="/assets/royce_etims/guide/img/21-invoice-failed.webp" alt="Invoice not signed"><figcaption>Not signed: the item had no KRA item code yet.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/22-invoice-retried.webp" alt="Invoice signed after retry"><figcaption>After registering the item and clicking Retry eTIMS: Sent.</figcaption></figure>
+<table>
+<tr><th>KRA's message</th><th>What to do</th></tr>
+<tr><td>Item ... has no eTIMS Item Code</td><td>Open the item, click <b>Sync to eTIMS</b>, then <b>Retry eTIMS</b> on the invoice.</td></tr>
+<tr><td>Item ... does not exist in your stock master</td><td>KRA has no stock for the item. Open the item and click <b>Sync to eTIMS</b> (it sends the stock you hold), or check <b>Stock Movements</b> for a failed one. Then Retry eTIMS.</td></tr>
+<tr><td>KRA only accepts item codes with a 2-letter quantity unit</td><td>Choose a two-letter unit on the item's KRA eTIMS tab (section 5).</td></tr>
+<tr><td>Tax rate mismatch</td><td>Nothing: the system corrects it and resends the sale by itself.</td></tr>
+<tr><td>Pending for a long time</td><td>KRA or the internet is slow. It's retried by itself; check again later.</td></tr>
+<tr><td>Anything else</td><td>Send the invoice number and the message to your support team.</td></tr>
+</table>
+
+<h2 id="purchases">11. Purchases from eTIMS suppliers</h2>
+<p>When a supplier who uses eTIMS sells to you, KRA records the sale against your PIN. Every hour these are fetched into <b>KRA eTIMS &gt; Purchases</b>. Open one, check it, and click <span class="btnname">Create Purchase Invoice</span>. When you submit the Purchase Invoice, the purchase is confirmed with KRA. Use <span class="btnname">Reject with KRA</span> for a purchase that isn't yours or is wrong. Goods you import are listed under <b>Imported Items</b> to approve or reject in the same way.</p>
+<figure><img src="/assets/royce_etims/guide/img/31-purchases.webp" alt="eTIMS purchases"><figcaption>Supplier invoices KRA holds for your PIN.</figcaption></figure>
+
+<h2 id="reports">12. Dashboard and reports</h2>
+<table>
+<tr><th>Where</th><th>Use it for</th></tr>
+<tr><td><b>Dashboard</b></td><td>Today at a glance: signed today, waiting for KRA, VAT signed this month, items and stock not yet at KRA, sales per day and per till.</td></tr>
+<tr><td><b>Compliance Status</b></td><td>Everything needing attention: unsigned invoices and credit notes, stock not sent, items not registered, each with what to do.</td></tr>
+<tr><td><b>VAT Summary</b></td><td>Taxable amounts and VAT per KRA band for a period, from what KRA signed. Use it to check your VAT return.</td></tr>
+<tr><td><b>KRA Lookup</b></td><td>What KRA itself holds: your items, branches, notices, sales and stock movements.</td></tr>
+<tr><td><b>eTIMS Log</b></td><td>Every call to KRA with KRA's answer, for your support team.</td></tr>
+</table>
+<figure><img src="/assets/royce_etims/guide/img/28-etims-compliance-status.webp" alt="Compliance status"><figcaption>Compliance Status.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/29-etims-vat-summary.webp" alt="VAT summary"><figcaption>VAT Summary by KRA band.</figcaption></figure>
+<figure><img src="/assets/royce_etims/guide/img/30-kra-lookup.webp" alt="KRA lookup"><figcaption>KRA Lookup: the items KRA holds for your PIN.</figcaption></figure>
+
+<h2 id="daily">13. Daily checklist</h2>
+<ul>
+<li>Open the eTIMS <b>Dashboard</b>. <b>Waiting for KRA</b> and <b>Stock Not Sent to KRA</b> should be <b>0</b> by the end of the day. If not, open <b>Compliance Status</b> and fix each line (section 10).</li>
+<li>Register every new item before it's sold: <b>Sync to eTIMS</b> on the item.</li>
+<li>Check that customers get receipts with the KRA QR code. Reprint any "KRA signature pending" receipts.</li>
+<li>At month end, compare the <b>VAT Summary</b> with your VAT return.</li>
+</ul>
+</div>
