@@ -38,7 +38,7 @@ frappe.ui.form.on("eTIMS Purchase", {
 		}
 		if (frm.doc.status === "New") {
 			frm.dashboard.set_headline(
-				__("Pick your Item on every line. Royce ERP remembers it for this supplier's next invoice.")
+				__("Pick your Item on every line. It's remembered for this supplier's next invoice.")
 			);
 		}
 	},

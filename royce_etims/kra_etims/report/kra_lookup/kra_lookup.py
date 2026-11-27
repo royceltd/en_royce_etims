@@ -101,7 +101,7 @@ def _columns(rows):
 			{"fieldname": "royce_doctype", "label": _("Type"), "fieldtype": "Data", "hidden": 1},
 			{
 				"fieldname": "in_royce_erp",
-				"label": _("In Royce ERP"),
+				"label": _("In This System"),
 				"fieldtype": "Dynamic Link",
 				"options": "royce_doctype",
 				"width": 180,
