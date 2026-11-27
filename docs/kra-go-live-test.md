@@ -290,7 +290,32 @@ Found live today:
 Still open before the real test: open questions 1-3 above (does "This device is installed" pass
 case 1; branch 02 vs 00; what starts a session), and items 2-4 (purchases) of "Purchases - open".
 
-## Go-Live sessions 22 and 25 November 2026 - START HERE NEXT
+## Go-Live session 27 November 2026 - SUBMITTED - START HERE NEXT
+
+**Status, 27 Nov ~15:00: all 23 cases passed and the Go-Live application was submitted on
+GavaConnect ("Once approved, you'll receive your production app credentials via email").
+Next: KRA picks a demonstration date, then production keys arrive by email. Production
+base URL and token URL are still blank in utils/config.py - ask KRA for them with the keys.**
+
+- New GavaConnect app: Apigee App ID bac2ff97-c16b-4f83-a7eb-06417f6d1bec (keys in the
+  gitignored royce-erp-cloud/.env, never in git). Test PIN **P600005780A**, branch **00**
+  (the form showed 02), device serial 5CD6472Z8WR, site golive.localhost.
+- First rehearse() pass: 15/22. KRA's sale to P600005780A came from etims.localhost
+  (ACC-SINV-2026-00013), so case 16 had a purchase to confirm. Then:
+  - 10 Save item: "Invalid itemCd Sequence, expected ...1" - golive's ID Mappings from the
+    old PINs; moved to "KRA Go-Live Test (old test PINs)". Then 10, 17, 11, 13, 14 (KRA
+    invoice 1 = ACC-SINV-2026-00018, credit note 2 = ACC-SINV-2026-00019), 20 passed.
+  - KRA screen still showed 2 fails: selectImportItemList (we asked since 25 Nov ->
+    "no search result", counted as a fail; refetched from full history: 3 imports) and
+    saveStockMaster ("rsdQty mismatch": kra_stock_balance summed the old PIN's movements
+    on the same branch + item code; old movements' sar_no negated, re-sent: 19 and 20 OK).
+- Lessons for a test PIN change on a reused site: reset imports_fetched_until, ID
+  Mappings, stock movements, branch counters, Company.tax_id; Consumer Key is a plain field
+  (only the secret is a password). A real client keeps one PIN, so none of this applies there.
+- Uploads (sample logo, no confidential images):
+  ~/Documents/company/royceerp/system docs/KRA Go-Live 2026-11-27/ (+ 800x400/ copies).
+
+## Go-Live sessions 22 and 25 November 2026
 
 **Status, 27 Nov: sales and purchases now go through at KRA, so all 23 cases work. Next: check the
 GavaConnect Validation screen shows 23/23 (or run the rehearsal inside a new session, branch 00), then
