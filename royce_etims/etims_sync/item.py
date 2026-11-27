@@ -327,9 +327,16 @@ def sync_item(item_code, company, kra_codes=None):
 		raise
 	branch = frappe.get_doc("eTIMS Branch", settings.default_branch)
 	item_cd = get_etims_id(item, company)
-	is_new_code = not item_cd
+	lost_code = None
 	if kra_codes is None or isinstance(kra_codes, str):
 		kra_codes = _kra_item_codes(company, branch)
+	if item_cd and item_cd not in kra_codes:
+		# A code we recorded that KRA doesn't hold: KRA answered "Successful" for
+		# KE2NTNO0000124 and then didn't have it (FOUND 2026-11-27, sandbox), and
+		# it refuses the same code again ("Expected sequence ending with 126").
+		# So the item gets the next code, and unsent stock moves to it.
+		lost_code, item_cd = item_cd, None
+	is_new_code = not item_cd
 
 	if is_new_code:
 		prefix = item_code_prefix(item)
@@ -368,6 +375,8 @@ def sync_item(item_code, company, kra_codes=None):
 		kra_codes.append(item_cd)
 		set_etims_id(item, company, item_cd)
 		item.save(ignore_permissions=True)
+		if lost_code:
+			_move_unsent_stock(lost_code, item_cd)
 
 	_mark_synced(item)
 	declare_opening_stock(item.name, company)
@@ -386,6 +395,30 @@ def assign_etims_item_code(item_code, company, etims_id):
 	set_etims_id(item, company, etims_id)
 	item.save()
 	return {"success": True, "message": _("eTIMS Item Code set for {0}.").format(company)}
+
+
+def _move_unsent_stock(old_code, new_code):
+	"""Point stock movements KRA hasn't accepted yet at the item's new code, and
+	queue them again."""
+	from royce_etims.etims_sync.stock import _enqueue_branch
+
+	rows = frappe.db.sql(
+		"""
+		SELECT DISTINCT m.name, m.branch FROM `tabeTIMS Stock Movement Item` i
+		JOIN `tabeTIMS Stock Movement` m ON m.name = i.parent
+		WHERE i.item_cd = %s AND m.status IN ('Pending', 'Failed')
+		""",
+		old_code,
+		as_dict=True,
+	)
+	for row in rows:
+		frappe.db.sql(
+			"UPDATE `tabeTIMS Stock Movement Item` SET item_cd = %s WHERE parent = %s AND item_cd = %s",
+			(new_code, row.name, old_code),
+		)
+		frappe.db.set_value("eTIMS Stock Movement", row.name, "retry_count", 0, update_modified=False)
+	for branch in {row.branch for row in rows}:
+		_enqueue_branch(branch)
 
 
 def declare_opening_stock(item_code, company):

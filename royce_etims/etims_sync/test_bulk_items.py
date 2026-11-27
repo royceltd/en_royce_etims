@@ -69,3 +69,24 @@ class IntegrationTestBulkItems(IntegrationTestCase):
 			patch("royce_etims.etims_sync.item.opening_stock", return_value=(0, 0)),
 		):
 			self.assertIsNone(item_sync.declare_opening_stock("BULK-T", "C"))
+
+	def test_code_kra_lost_is_replaced_by_the_next_one(self):
+		item = _item(royce_etims_quantity_unit_code="NO")
+		item.append("royce_etims_id_mapping", {"setup_doctype": "eTIMS Settings", "setup_docname": "C", "etims_id": "KE2NTNO0000124"})
+		sent = []
+		with (
+			patch("frappe.get_doc", side_effect=lambda dt, *a, **k: item if dt == "Item" else frappe._dict(bhf_id="00")),
+			patch("royce_etims.etims_sync.item.get_settings", return_value=frappe._dict(default_branch="C-00")),
+			patch("royce_etims.etims_sync.item._validate_ready_to_sync"),
+			patch("royce_etims.etims_sync.item._known_item_codes", side_effect=lambda c, codes: codes + ["KE2NTNO0000124"]),
+			patch("royce_etims.etims_sync.item.item_code_prefix", return_value="KE2NTNO"),
+			patch("royce_etims.etims_sync.item.build_item_payload", side_effect=lambda i, cd: {"itemCd": cd}),
+			patch("royce_etims.etims_sync.item.etims_request", side_effect=lambda *a, **k: sent.append(k["payload"]["itemCd"])),
+			patch.object(type(item), "save"),
+			patch("royce_etims.etims_sync.item._mark_synced"),
+			patch("royce_etims.etims_sync.item.declare_opening_stock"),
+			patch("royce_etims.etims_sync.item._move_unsent_stock") as moved,
+		):
+			item_sync.sync_item("BULK-T", "C", kra_codes=["KE2NTNO0000123", "KE2NTNO0000125"])
+		self.assertEqual(sent, ["KE2NTNO0000126"])
+		moved.assert_called_once_with("KE2NTNO0000124", "KE2NTNO0000126")
